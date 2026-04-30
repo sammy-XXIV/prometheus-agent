@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROMETHEUS</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #020408;
+    --surface: #060d14;
+    --border: #0a2040;
+    --accent: #00c8ff;
+    --accent2: #00ff9d;
+    --danger: #ff3d3d;
+    --warn: #ffb800;
+    --text: #c8e0f0;
+    --dim: #2a4a6a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(0,200,255,0.015) 40px, rgba(0,200,255,0.015) 41px),
+      repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(0,200,255,0.015) 40px, rgba(0,200,255,0.015) 41px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 48px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+  }
+
+  .logo {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-size: 56px;
+    font-weight: 700;
+    letter-spacing: 8px;
+    color: var(--accent);
+    text-transform: uppercase;
+    line-height: 1;
+    text-shadow: 0 0 40px rgba(0,200,255,0.3);
+  }
+
+  .tagline {
+    font-size: 13px;
+    color: var(--dim);
+    letter-spacing: 4px;
+    margin-top: 8px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    border: 1px solid var(--accent2);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--accent2);
+  }
+
+  .pulse {
+    width: 8px;
+    height: 8px;
+    background: var(--accent2);
+    border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(0.8); }
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 2px;
+    margin-bottom: 2px;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2px;
+    margin-bottom: 2px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.4;
+  }
+
+  .panel-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--dim);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .big-number {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 48px;
+    color: var(--accent);
+    line-height: 1;
+    text-shadow: 0 0 20px rgba(0,200,255,0.4);
+  }
+
+  .big-number.green { color: var(--accent2); text-shadow: 0 0 20px rgba(0,255,157,0.4); }
+  .big-number.danger { color: var(--danger); text-shadow: 0 0 20px rgba(255,61,61,0.4); }
+  .big-number.warn { color: var(--warn); }
+
+  .sub-label {
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: 2px;
+    margin-top: 8px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .mode-display {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .mode-THRIVING { color: var(--accent2); }
+  .mode-STABLE { color: var(--accent); }
+  .mode-GROWTH { color: var(--accent); }
+  .mode-UNSTABLE { color: var(--warn); }
+  .mode-SURVIVAL { color: var(--warn); }
+  .mode-CRITICAL { color: var(--danger); }
+  .mode-DYING { color: var(--danger); animation: flicker 0.5s infinite; }
+
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .wallet-address {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    word-break: break-all;
+    line-height: 1.8;
+  }
+
+  .explorer-link {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    text-decoration: none;
+    letter-spacing: 1px;
+    margin-top: 12px;
+    display: inline-block;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 2px;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .explorer-link:hover { color: var(--accent); border-color: var(--accent); }
+
+  .services-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .service-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(0,200,255,0.03);
+    border: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .service-name {
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+
+  .service-price {
+    color: var(--accent2);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+  }
+
+  .log-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+    margin-top: 2px;
+  }
+
+  .log-entry {
+    display: flex;
+    gap: 16px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(10,32,64,0.5);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .log-time { color: var(--dim); min-width: 80px; }
+  .log-msg { color: var(--text); }
+  .log-msg.info { color: var(--accent); }
+  .log-msg.success { color: var(--accent2); }
+  .log-msg.warn { color: var(--warn); }
+  .log-msg.danger { color: var(--danger); }
+
+  .uptime-bar {
+    height: 2px;
+    background: var(--border);
+    margin-top: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .uptime-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    animation: scan 3s linear infinite;
+  }
+
+  @keyframes scan {
+    0% { width: 0%; margin-left: 0; }
+    50% { width: 100%; margin-left: 0; }
+    100% { width: 0%; margin-left: 100%; }
+  }
+
+  footer {
+    margin-top: 40px;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-text {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 2px;
+  }
+
+  .refresh-indicator {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <div class="logo">Autonomous AI Agent // Kite Network</div>
+      <h1>PROMETHEUS</h1>
+      <div class="tagline">SURVIVE. EARN. EVOLVE.</div>
+    </div>
+    <div>
+      <div class="status-badge">
+        <div class="pulse" id="pulse"></div>
+        <span id="alive-status">CHECKING...</span>
+      </div>
+      <div class="uptime-bar"><div class="uptime-fill"></div></div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-label">Treasury Balance</div>
+      <div class="big-number green" id="balance">--</div>
+      <div class="sub-label">USDC // KITE NETWORK</div>
+    </div>
+    <div class="panel">
+      <div class="panel-label">Operational Mode</div>
+      <div class="mode-display mode-STABLE" id="mode">--</div>
+      <div class="sub-label" id="mode-desc">ASSESSING...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-label">Generation</div>
+      <div class="big-number" id="generation">--</div>
+      <div class="sub-label">EVOLUTION STAGE</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-label">Total Earned</div>
+      <div class="big-number green" id="earned">$0.0000</div>
+      <div class="sub-label">LIFETIME USDC REVENUE</div>
+    </div>
+    <div class="panel">
+      <div class="panel-label">Uptime</div>
+      <div class="big-number" id="uptime">--</div>
+      <div class="sub-label">SECONDS ALIVE</div>
+    </div>
+    <div class="panel">
+      <div class="panel-label">Services Active</div>
+      <div class="big-number" id="service-count">26</div>
+      <div class="sub-label">INCOME STREAMS</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-label">Wallet Identity</div>
+      <div class="wallet-address" id="wallet">--</div>
+      <a class="explorer-link" id="explorer-link" href="#" target="_blank">VIEW ON KITESCAN</a>
+    </div>
+    <div class="panel">
+      <div class="panel-label">Network</div>
+      <div style="margin-top: 8px;">
+        <div class="sub-label" style="margin-bottom: 8px;">CHAIN ID</div>
+        <div style="font-family: 'Share Tech Mono', monospace; color: var(--accent); font-size: 20px;">2366</div>
+        <div class="sub-label" style="margin-top: 16px; margin-bottom: 8px;">RPC</div>
+        <div style="font-family: 'Share Tech Mono', monospace; color: var(--dim); font-size: 10px;">rpc.gokite.ai</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top: 2px;">
+    <div class="panel-label">Active Services</div>
+    <div class="services-grid" id="services-grid">
+      <div class="service-item"><span class="service-name">LOADING...</span></div>
+    </div>
+  </div>
+
+  <div class="log-panel">
+    <div class="panel-label">System Log</div>
+    <div id="log-container"></div>
+  </div>
+
+  <footer>
+    <div class="footer-text">PROMETHEUS // AUTONOMOUS FINANCIAL ORGANISM // KITE AI</div>
+    <div class="refresh-indicator" id="refresh-timer">REFRESH IN 30s</div>
+  </footer>
+</div>
+
+<script>
+  const API = ''
+  let countdown = 30
+
+  function addLog(msg, type = '') {
+    const container = document.getElementById('log-container')
+    const now = new Date()
+    const time = now.toTimeString().split(' ')[0]
+    const entry = document.createElement('div')
+    entry.className = 'log-entry'
+    entry.innerHTML = `<span class="log-time">${time}</span><span class="log-msg ${type}">${msg}</span>`
+    container.insertBefore(entry, container.firstChild)
+    if (container.children.length > 20) container.removeChild(container.lastChild)
+  }
+
+  function getModeDesc(mode) {
+    const descs = {
+      'THRIVING': 'Revenue exceeds costs. Expanding capabilities.',
+      'GROWTH': 'Profitable. Reinvesting surplus.',
+      'STABLE': 'Operational. Maintaining balance.',
+      'UNSTABLE': 'Revenue declining. Adjusting strategy.',
+      'SURVIVAL': 'Critical low balance. Slashing prices.',
+      'CRITICAL': 'Near zero. Emergency protocols active.',
+      'DYING': 'Balance depleted. Fighting to survive.'
+    }
+    return descs[mode] || 'Assessing situation...'
+  }
+
+  async function fetchState() {
+    try {
+      const res = await fetch(API + '/')
+      const data = await res.json()
+
+      document.getElementById('wallet').textContent = data.wallet
+      document.getElementById('uptime').textContent = data.uptime
+      document.getElementById('service-count').textContent = data.totalServices
+
+      const explorerLink = document.getElementById('explorer-link')
+      explorerLink.href = data.explorer
+      explorerLink.textContent = 'VIEW ON KITESCAN ->'
+
+      document.getElementById('alive-status').textContent = 'PROMETHEUS ONLINE'
+      document.getElementById('pulse').style.background = 'var(--accent2)'
+
+      addLog('State updated. Uptime: ' + data.uptime + 's', 'info')
+    } catch(e) {
+      addLog('Failed to fetch state: ' + e.message, 'danger')
+    }
+  }
+
+  async function fetchServices() {
+    try {
+      const res = await fetch(API + '/services')
+      const data = await res.json()
+      const grid = document.getElementById('services-grid')
+      grid.innerHTML = ''
+      Object.entries(data).slice(0, 20).forEach(([key, val]) => {
+        const item = document.createElement('div')
+        item.className = 'service-item'
+        item.innerHTML = `
+          <span class="service-name">${key.replace(/_/g, ' ').toUpperCase()}</span>
+          <span class="service-price">$${val.price}</span>
+        `
+        grid.appendChild(item)
+      })
+      document.getElementById('service-count').textContent = Object.keys(data).length
+    } catch(e) {
+      addLog('Failed to fetch services: ' + e.message, 'warn')
+    }
+  }
+
+  async function fetchBalance() {
+    try {
+      const res = await fetch('https://rpc.gokite.ai/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_call',
+          params: [{
+            to: '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e',
+            data: '0x70a08231000000000000000000000000' + '9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'
+          }, 'latest'],
+          id: 1
+        })
+      })
+      const data = await res.json()
+      const raw = parseInt(data.result, 16)
+      const balance = (raw / 1e6).toFixed(4)
+      document.getElementById('balance').textContent = '$' + balance
+
+      const mode = parseFloat(balance) >= 3 ? 'THRIVING' :
+                   parseFloat(balance) >= 2 ? 'GROWTH' :
+                   parseFloat(balance) >= 1 ? 'STABLE' :
+                   parseFloat(balance) >= 0.5 ? 'UNSTABLE' :
+                   parseFloat(balance) >= 0.2 ? 'SURVIVAL' :
+                   parseFloat(balance) > 0 ? 'CRITICAL' : 'DYING'
+
+      const modeEl = document.getElementById('mode')
+      modeEl.textContent = mode
+      modeEl.className = 'mode-display mode-' + mode
+      document.getElementById('mode-desc').textContent = getModeDesc(mode)
+      document.getElementById('generation').textContent = '2'
+
+      addLog('Balance: $' + balance + ' USDC | Mode: ' + mode, 
+             parseFloat(balance) >= 1 ? 'success' : 'warn')
+    } catch(e) {
+      addLog('Balance check failed: ' + e.message, 'danger')
+    }
+  }
+
+  function startCountdown() {
+    setInterval(() => {
+      countdown--
+      document.getElementById('refresh-timer').textContent = 'REFRESH IN ' + countdown + 's'
+      if (countdown <= 0) {
+        countdown = 30
+        fetchBalance()
+        fetchState()
+      }
+    }, 1000)
+  }
+
+  // Init
+  addLog('PROMETHEUS DASHBOARD INITIALIZING...', 'info')
+  fetchState()
+  fetchServices()
+  fetchBalance()
+  startCountdown()
+</script>
+</body>
+</html>

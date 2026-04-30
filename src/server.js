@@ -46,6 +46,8 @@ function ethers_units(price) {
 }
 
 // Free endpoints
+// root replaced
+app.get('/dashboard', (req, res) => res.sendFile(__dirname + '/../src/dashboard.html'))
 app.get('/', (req, res) => {
   res.json({
     name: 'Prometheus',
