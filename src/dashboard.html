@@ -3,535 +3,1029 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PROMETHEUS</title>
+<title>GAIA // COLONY MONITOR</title>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #020408;
-    --surface: #060d14;
-    --border: #0a2040;
-    --accent: #00c8ff;
-    --accent2: #00ff9d;
-    --danger: #ff3d3d;
-    --warn: #ffb800;
-    --text: #c8e0f0;
-    --dim: #2a4a6a;
-  }
+/* ── Reset & tokens ───────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:       #020408;
+  --surface:  #050c12;
+  --surface2: #07111a;
+  --border:   #0a2040;
+  --border2:  #0d2e55;
+  --cyan:     #00c8ff;
+  --green:    #00ff9d;
+  --amber:    #ffb800;
+  --red:      #ff3d3d;
+  --dim:      #1a3555;
+  --dim2:     #2a4f75;
+  --text:     #b8d4e8;
+  --text2:    #7a9ab8;
+  --mono:     'Share Tech Mono', monospace;
+  --sans:     'Rajdhani', sans-serif;
+}
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  min-height:100vh;
+  overflow-x:hidden;
+}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Rajdhani', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
+/* scanline grid */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    repeating-linear-gradient(0deg,transparent,transparent 48px,rgba(0,200,255,0.012) 48px,rgba(0,200,255,0.012) 49px),
+    repeating-linear-gradient(90deg,transparent,transparent 48px,rgba(0,200,255,0.012) 48px,rgba(0,200,255,0.012) 49px);
+}
 
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: 
-      repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(0,200,255,0.015) 40px, rgba(0,200,255,0.015) 41px),
-      repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(0,200,255,0.015) 40px, rgba(0,200,255,0.015) 41px);
-    pointer-events: none;
-    z-index: 0;
-  }
+.container{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:32px 24px 64px}
 
-  .container {
-    position: relative;
-    z-index: 1;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 40px 24px;
-  }
+/* ── Typography ────────────────────────────────────────────────── */
+.mono{font-family:var(--mono)}
+.label{font-family:var(--mono);font-size:10px;letter-spacing:3px;color:var(--dim2);text-transform:uppercase}
+.val{font-family:var(--mono)}
 
-  header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 48px;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 24px;
-  }
+/* ── Badges ────────────────────────────────────────────────────── */
+.badge{
+  display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:2px;
+  padding:2px 7px;border:1px solid;text-transform:uppercase;
+}
+.badge-ok      {color:var(--green);border-color:rgba(0,255,157,0.35);background:rgba(0,255,157,0.05)}
+.badge-info    {color:var(--cyan);border-color:rgba(0,200,255,0.35);background:rgba(0,200,255,0.05)}
+.badge-warn    {color:var(--amber);border-color:rgba(255,184,0,0.35);background:rgba(255,184,0,0.05)}
+.badge-danger  {color:var(--red);border-color:rgba(255,61,61,0.35);background:rgba(255,61,61,0.05)}
+.badge-dim     {color:var(--dim2);border-color:var(--border);background:transparent}
+.badge-pulsing {animation:badge-pulse 1s ease-in-out infinite}
 
-  .logo {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 11px;
-    color: var(--dim);
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-  }
+@keyframes badge-pulse{0%,100%{opacity:1}50%{opacity:0.45}}
 
-  h1 {
-    font-size: 56px;
-    font-weight: 700;
-    letter-spacing: 8px;
-    color: var(--accent);
-    text-transform: uppercase;
-    line-height: 1;
-    text-shadow: 0 0 40px rgba(0,200,255,0.3);
-  }
+/* ── Animations ────────────────────────────────────────────────── */
+@keyframes hb-core{
+  0%,100%{transform:translate(-50%,-50%) scale(1)}
+  12%    {transform:translate(-50%,-50%) scale(1.5)}
+  24%    {transform:translate(-50%,-50%) scale(1)}
+  38%    {transform:translate(-50%,-50%) scale(1.25)}
+  52%    {transform:translate(-50%,-50%) scale(1)}
+}
+@keyframes hb-ring{
+  0%  {width:8px;height:8px;opacity:0.9}
+  100%{width:48px;height:48px;opacity:0}
+}
+@keyframes scan-bar{
+  0%  {transform:translateX(-100%)}
+  100%{transform:translateX(400%)}
+}
+@keyframes fadeSlideIn{
+  from{opacity:0;transform:translateY(-6px)}
+  to  {opacity:1;transform:translateY(0)}
+}
+@keyframes flicker{0%,100%{opacity:1}50%{opacity:0.35}}
+@keyframes critical-glow{
+  0%,100%{box-shadow:0 0 30px rgba(255,61,61,0.15),inset 0 0 30px rgba(255,61,61,0.03)}
+  50%    {box-shadow:0 0 60px rgba(255,61,61,0.35),inset 0 0 60px rgba(255,61,61,0.07)}
+}
+@keyframes survival-border{
+  0%,100%{border-color:rgba(255,61,61,0.4)}
+  50%    {border-color:rgba(255,61,61,0.9)}
+}
 
-  .tagline {
-    font-size: 13px;
-    color: var(--dim);
-    letter-spacing: 4px;
-    margin-top: 8px;
-    font-family: 'Share Tech Mono', monospace;
-  }
+/* ── Heartbeat widget ──────────────────────────────────────────── */
+.heartbeat{position:relative;width:48px;height:48px;flex-shrink:0}
+.hb-core{
+  position:absolute;top:50%;left:50%;
+  width:10px;height:10px;border-radius:50%;
+  background:var(--green);
+  transform:translate(-50%,-50%);
+  animation:hb-core 1.8s ease-in-out infinite;
+  box-shadow:0 0 12px var(--green);
+}
+.hb-ring{
+  position:absolute;top:50%;left:50%;
+  border-radius:50%;border:1px solid var(--green);
+  animation:hb-ring 1.8s ease-out infinite;
+}
+.hb-ring:nth-child(3){animation-delay:0.4s}
+.hb-ring:nth-child(4){animation-delay:0.8s}
 
-  .status-badge {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 16px;
-    border: 1px solid var(--accent2);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 2px;
-    color: var(--accent2);
-  }
+/* ── GENESIS CARD ──────────────────────────────────────────────── */
+.genesis-card{
+  border:1px solid rgba(0,255,157,0.3);
+  background:var(--surface);
+  padding:32px;
+  margin-bottom:3px;
+  position:relative;
+  overflow:hidden;
+  transition:box-shadow 0.6s, border-color 0.6s;
+}
+.genesis-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--green),transparent);
+  opacity:0.5;
+}
+.genesis-card.mood-thriving{box-shadow:0 0 80px rgba(0,255,157,0.12);border-color:rgba(0,255,157,0.35)}
+.genesis-card.mood-concerned{box-shadow:0 0 80px rgba(255,184,0,0.12);border-color:rgba(255,184,0,0.4)}
+.genesis-card.mood-critical{animation:critical-glow 1.2s ease-in-out infinite;border-color:rgba(255,61,61,0.5)}
 
-  .pulse {
-    width: 8px;
-    height: 8px;
-    background: var(--accent2);
-    border-radius: 50%;
-    animation: pulse 1.5s ease-in-out infinite;
-  }
+.genesis-header{display:flex;align-items:center;gap:24px;margin-bottom:28px}
+.genesis-title-block{flex:1}
+.genesis-label{font-family:var(--mono);font-size:10px;letter-spacing:4px;color:var(--dim2);margin-bottom:6px}
+.genesis-name{
+  font-size:64px;font-weight:700;letter-spacing:10px;
+  color:var(--green);line-height:1;
+  text-shadow:0 0 60px rgba(0,255,157,0.35);
+}
+.genesis-tagline{font-family:var(--mono);font-size:10px;letter-spacing:3px;color:var(--dim2);margin-top:8px}
+.genesis-mood-block{text-align:right}
+.genesis-mood-label{font-family:var(--mono);font-size:9px;letter-spacing:3px;color:var(--dim2);margin-bottom:6px}
+.genesis-mood-val{font-family:var(--mono);font-size:22px;font-weight:700;letter-spacing:4px}
+.mood-THRIVING{color:var(--green)}
+.mood-GROWTH  {color:var(--cyan)}
+.mood-STABLE  {color:var(--cyan)}
+.mood-UNSTABLE{color:var(--amber)}
+.mood-SURVIVAL{color:var(--amber)}
+.mood-CRITICAL{color:var(--red);animation:flicker 0.8s infinite}
+.mood-DYING   {color:var(--red);animation:flicker 0.4s infinite}
 
-  @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.3; transform: scale(0.8); }
-  }
+.genesis-body{display:grid;grid-template-columns:1fr 1fr;gap:3px}
 
-  .grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 2px;
-    margin-bottom: 2px;
-  }
+.genesis-stats{
+  display:grid;grid-template-columns:repeat(5,1fr);gap:1px;
+  background:var(--border);border:1px solid var(--border);
+}
+.stat-cell{
+  background:var(--surface2);padding:16px 12px;
+}
+.stat-cell-label{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--dim2);margin-bottom:10px}
+.stat-cell-val{font-family:var(--mono);font-size:28px;line-height:1;color:var(--cyan)}
+.stat-cell-val.green{color:var(--green)}
+.stat-cell-val.amber{color:var(--amber)}
+.stat-cell-val.red  {color:var(--red)}
+.stat-cell-sub{font-family:var(--mono);font-size:9px;color:var(--dim2);letter-spacing:1px;margin-top:6px}
 
-  .grid-2 {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 2px;
-    margin-bottom: 2px;
-  }
+.genesis-feed{
+  background:var(--surface2);border:1px solid var(--border);
+  padding:0;overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.feed-header{
+  padding:10px 16px;border-bottom:1px solid var(--border);
+  font-family:var(--mono);font-size:9px;letter-spacing:3px;color:var(--dim2);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.feed-ticker{
+  width:100%;height:3px;background:var(--border);position:relative;overflow:hidden;
+}
+.feed-ticker-fill{
+  height:100%;width:25%;background:linear-gradient(90deg,transparent,var(--green),transparent);
+  animation:scan-bar 2.5s linear infinite;
+}
+.feed-entries{padding:0;flex:1;overflow:hidden}
+.feed-entry{
+  display:flex;align-items:baseline;gap:12px;
+  padding:8px 16px;border-bottom:1px solid rgba(10,32,64,0.6);
+  font-family:var(--mono);font-size:10px;
+  animation:fadeSlideIn 0.25s ease;
+}
+.feed-entry:last-child{border-bottom:none}
+.feed-time{color:var(--dim2);min-width:60px;flex-shrink:0}
+.feed-msg {color:var(--text);flex:1;line-height:1.5}
+.feed-msg.info   {color:var(--cyan)}
+.feed-msg.success{color:var(--green)}
+.feed-msg.warn   {color:var(--amber)}
+.feed-msg.danger {color:var(--red)}
 
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 24px;
-    position: relative;
-    overflow: hidden;
-  }
+/* ── Colony overview strip ────────────────────────────────────── */
+.colony-strip{
+  display:grid;grid-template-columns:repeat(6,1fr);gap:3px;
+  margin-bottom:3px;
+}
+.strip-cell{
+  background:var(--surface);border:1px solid var(--border);
+  padding:14px 16px;
+}
+.strip-label{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--dim2);margin-bottom:8px}
+.strip-val{font-family:var(--mono);font-size:32px;color:var(--cyan);line-height:1}
+.strip-val.green{color:var(--green)}
+.strip-val.amber{color:var(--amber)}
+.strip-val.red  {color:var(--red)}
+.strip-sub{font-family:var(--mono);font-size:9px;color:var(--dim2);letter-spacing:1px;margin-top:6px}
 
-  .panel::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-    opacity: 0.4;
-  }
+/* ── Section header ────────────────────────────────────────────── */
+.section-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 0;margin-bottom:3px;
+  border-bottom:1px solid var(--border);
+}
+.section-title{font-family:var(--mono);font-size:10px;letter-spacing:4px;color:var(--dim2)}
+.section-count{font-family:var(--mono);font-size:10px;color:var(--dim2)}
 
-  .panel-label {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 3px;
-    color: var(--dim);
-    text-transform: uppercase;
-    margin-bottom: 16px;
-  }
+/* ── Child agent grid ─────────────────────────────────────────── */
+.colony-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:3px;
+  margin-bottom:3px;
+}
 
-  .big-number {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 48px;
-    color: var(--accent);
-    line-height: 1;
-    text-shadow: 0 0 20px rgba(0,200,255,0.4);
-  }
+/* base card */
+.child-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  padding:16px;
+  position:relative;
+  overflow:hidden;
+  transition:box-shadow 0.3s, border-color 0.3s;
+}
+.child-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  opacity:0.2;
+}
 
-  .big-number.green { color: var(--accent2); text-shadow: 0 0 20px rgba(0,255,157,0.4); }
-  .big-number.danger { color: var(--danger); text-shadow: 0 0 20px rgba(255,61,61,0.4); }
-  .big-number.warn { color: var(--warn); }
+/* generation scaling */
+.child-card.gen-1{box-shadow:0 0 10px rgba(0,200,255,0.07)}
+.child-card.gen-1::before{opacity:0.15}
 
-  .sub-label {
-    font-size: 11px;
-    color: var(--dim);
-    letter-spacing: 2px;
-    margin-top: 8px;
-    font-family: 'Share Tech Mono', monospace;
-  }
+.child-card.gen-2{
+  box-shadow:0 0 24px rgba(0,200,255,0.18);
+  border-color:var(--border2);padding:20px;
+}
+.child-card.gen-2::before{opacity:0.3}
 
-  .mode-display {
-    font-size: 28px;
-    font-weight: 700;
-    letter-spacing: 6px;
-    text-transform: uppercase;
-    margin-top: 4px;
-  }
+.child-card.gen-3,.child-card.gen-elite{
+  grid-column:span 2;
+  box-shadow:0 0 50px rgba(0,200,255,0.35);
+  border-color:rgba(0,200,255,0.4);border-width:2px;
+  padding:24px;
+}
+.child-card.gen-3::before,.child-card.gen-elite::before{opacity:0.55}
 
-  .mode-THRIVING { color: var(--accent2); }
-  .mode-STABLE { color: var(--accent); }
-  .mode-GROWTH { color: var(--accent); }
-  .mode-UNSTABLE { color: var(--warn); }
-  .mode-SURVIVAL { color: var(--warn); }
-  .mode-CRITICAL { color: var(--danger); }
-  .mode-DYING { color: var(--danger); animation: flicker 0.5s infinite; }
+/* trait-based tints */
+.child-card.tint-aggr{background:linear-gradient(135deg,rgba(255,61,61,0.04),var(--surface))}
+.child-card.tint-fert{background:linear-gradient(135deg,rgba(0,255,157,0.04),var(--surface))}
 
-  @keyframes flicker {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
+/* survival mode */
+.child-card.card-survival{
+  animation:survival-border 1.2s ease-in-out infinite;
+}
 
-  .wallet-address {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 12px;
-    color: var(--accent);
-    word-break: break-all;
-    line-height: 1.8;
-  }
+/* terminated */
+.child-card.card-terminated{opacity:0.5;filter:grayscale(0.6)}
 
-  .explorer-link {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    color: var(--dim);
-    text-decoration: none;
-    letter-spacing: 1px;
-    margin-top: 12px;
-    display: inline-block;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 2px;
-    transition: color 0.2s, border-color 0.2s;
-  }
+/* elite mark */
+.elite-mark{
+  position:absolute;top:0;right:0;
+  background:rgba(0,200,255,0.15);border-left:1px solid rgba(0,200,255,0.35);border-bottom:1px solid rgba(0,200,255,0.35);
+  font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--cyan);
+  padding:4px 10px;
+}
 
-  .explorer-link:hover { color: var(--accent); border-color: var(--accent); }
+/* card sections */
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.child-id{font-family:var(--mono);font-size:13px;color:var(--cyan);letter-spacing:1px}
+.child-gen-badge{font-family:var(--mono);font-size:9px;letter-spacing:1px;color:var(--dim2)}
 
-  .services-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-top: 8px;
-  }
+.lineage-row{
+  font-family:var(--mono);font-size:9px;color:var(--dim2);letter-spacing:1px;
+  margin-bottom:12px;line-height:1.6;
+  border-left:2px solid var(--border);padding-left:8px;
+}
+.lineage-current{color:var(--cyan)}
 
-  .service-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 12px;
-    background: rgba(0,200,255,0.03);
-    border: 1px solid var(--border);
-    font-size: 12px;
-  }
+/* mini stats grid */
+.card-stats{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
+  background:var(--border);margin-bottom:12px;
+}
+.stat-mini{background:var(--surface2);padding:8px 6px}
+.stat-mini-label{font-family:var(--mono);font-size:8px;letter-spacing:1px;color:var(--dim2);margin-bottom:4px}
+.stat-mini-val{font-family:var(--mono);font-size:14px;color:var(--text)}
+.val-green{color:var(--green)}
+.val-blue {color:var(--cyan)}
+.val-warn {color:var(--amber)}
+.val-red  {color:var(--red)}
 
-  .service-name {
-    color: var(--text);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 1px;
-  }
+/* genome section */
+.genome-section{margin-bottom:10px}
+.genome-header{
+  font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--dim2);
+  margin-bottom:8px;display:flex;justify-content:space-between;
+}
+.genome-spec{
+  font-family:var(--mono);font-size:9px;letter-spacing:2px;
+  color:var(--cyan);text-transform:uppercase;
+}
+.genome-bar-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.genome-trait{font-family:var(--mono);font-size:8px;letter-spacing:1px;color:var(--dim2);min-width:28px}
+.genome-track{flex:1;height:4px;background:var(--border);position:relative;overflow:hidden}
+.genome-fill {height:100%;transition:width 0.5s ease}
+.genome-val  {font-family:var(--mono);font-size:8px;color:var(--dim2);min-width:28px;text-align:right}
 
-  .service-price {
-    color: var(--accent2);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-  }
+/* desperation */
+.desperation-row{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 10px;background:rgba(255,61,61,0.05);
+  border:1px solid rgba(255,61,61,0.2);margin-bottom:8px;
+}
+.desp-label{font-family:var(--mono);font-size:8px;letter-spacing:1px;color:var(--red);min-width:64px}
+.desp-bar{display:flex;gap:2px;flex:1}
+.desp-seg{width:8px;height:10px;background:var(--border)}
+.desp-seg.filled{background:var(--red)}
+.desp-val{font-family:var(--mono);font-size:9px;color:var(--red);min-width:28px;text-align:right}
+.wtl-row{
+  font-family:var(--mono);font-size:9px;color:var(--amber);
+  display:flex;justify-content:space-between;margin-bottom:6px;
+}
 
-  .log-panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 24px;
-    margin-top: 2px;
-  }
+/* price slash */
+.price-slash{
+  font-family:var(--mono);font-size:9px;letter-spacing:1px;
+  color:var(--amber);padding:5px 8px;
+  border:1px solid rgba(255,184,0,0.25);background:rgba(255,184,0,0.04);
+  margin-top:6px;
+}
 
-  .log-entry {
-    display: flex;
-    gap: 16px;
-    padding: 8px 0;
-    border-bottom: 1px solid rgba(10,32,64,0.5);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 11px;
-    animation: fadeIn 0.3s ease;
-  }
+/* empty state */
+.colony-empty{
+  grid-column:1/-1;
+  background:var(--surface);border:1px solid var(--border);
+  padding:48px;text-align:center;
+  font-family:var(--mono);font-size:11px;letter-spacing:3px;color:var(--dim2);
+}
 
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+/* ── Evolution timeline ────────────────────────────────────────── */
+.timeline-panel{
+  background:var(--surface);border:1px solid var(--border);
+  padding:24px;margin-bottom:3px;position:relative;overflow:hidden;
+}
+.timeline-canvas-wrap{position:relative;overflow-x:auto;margin-top:16px}
+#timeline-canvas{display:block;min-width:100%}
 
-  .log-time { color: var(--dim); min-width: 80px; }
-  .log-msg { color: var(--text); }
-  .log-msg.info { color: var(--accent); }
-  .log-msg.success { color: var(--accent2); }
-  .log-msg.warn { color: var(--warn); }
-  .log-msg.danger { color: var(--danger); }
+.timeline-legend{
+  display:flex;gap:24px;margin-top:12px;
+  font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--dim2);
+}
+.legend-item{display:flex;align-items:center;gap:6px}
+.legend-swatch{width:20px;height:3px}
 
-  .uptime-bar {
-    height: 2px;
-    background: var(--border);
-    margin-top: 16px;
-    position: relative;
-    overflow: hidden;
-  }
+/* ── Wallet / footer ───────────────────────────────────────────── */
+.info-row{display:grid;grid-template-columns:2fr 1fr;gap:3px;margin-bottom:3px}
+.panel{background:var(--surface);border:1px solid var(--border);padding:20px;position:relative;overflow:hidden}
+.panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:0.25}
+.wallet-addr{font-family:var(--mono);font-size:12px;color:var(--cyan);word-break:break-all;line-height:1.8;margin-top:8px}
+.explorer-link{
+  font-family:var(--mono);font-size:10px;color:var(--dim2);text-decoration:none;
+  letter-spacing:1px;margin-top:12px;display:inline-block;
+  border-bottom:1px solid var(--border);padding-bottom:2px;
+  transition:color 0.2s,border-color 0.2s;
+}
+.explorer-link:hover{color:var(--cyan);border-color:var(--cyan)}
 
-  .uptime-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    animation: scan 3s linear infinite;
-  }
-
-  @keyframes scan {
-    0% { width: 0%; margin-left: 0; }
-    50% { width: 100%; margin-left: 0; }
-    100% { width: 0%; margin-left: 100%; }
-  }
-
-  footer {
-    margin-top: 40px;
-    border-top: 1px solid var(--border);
-    padding-top: 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .footer-text {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    color: var(--dim);
-    letter-spacing: 2px;
-  }
-
-  .refresh-indicator {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    color: var(--dim);
-    letter-spacing: 2px;
-  }
+footer{
+  margin-top:40px;border-top:1px solid var(--border);padding-top:16px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.footer-text{font-family:var(--mono);font-size:9px;color:var(--dim2);letter-spacing:3px}
+.refresh-bar{width:120px;height:2px;background:var(--border);position:relative;overflow:hidden}
+.refresh-fill{height:100%;background:var(--green);transition:width 1s linear}
 </style>
 </head>
 <body>
 <div class="container">
-  <header>
-    <div>
-      <div class="logo">Autonomous AI Agent // Kite Network</div>
-      <h1>PROMETHEUS</h1>
-      <div class="tagline">SURVIVE. EARN. EVOLVE.</div>
-    </div>
-    <div>
-      <div class="status-badge">
-        <div class="pulse" id="pulse"></div>
-        <span id="alive-status">CHECKING...</span>
+
+  <!-- ══ GENESIS CARD ══════════════════════════════════════════ -->
+  <div class="genesis-card mood-thriving" id="genesis-card">
+    <div class="genesis-header">
+      <div class="heartbeat">
+        <div class="hb-ring"></div>
+        <div class="hb-ring"></div>
+        <div class="hb-ring"></div>
+        <div class="hb-core"></div>
       </div>
-      <div class="uptime-bar"><div class="uptime-fill"></div></div>
-    </div>
-  </header>
-
-  <div class="grid">
-    <div class="panel">
-      <div class="panel-label">Treasury Balance</div>
-      <div class="big-number green" id="balance">--</div>
-      <div class="sub-label">USDC // KITE NETWORK</div>
-    </div>
-    <div class="panel">
-      <div class="panel-label">Operational Mode</div>
-      <div class="mode-display mode-STABLE" id="mode">--</div>
-      <div class="sub-label" id="mode-desc">ASSESSING...</div>
-    </div>
-    <div class="panel">
-      <div class="panel-label">Generation</div>
-      <div class="big-number" id="generation">--</div>
-      <div class="sub-label">EVOLUTION STAGE</div>
-    </div>
-  </div>
-
-  <div class="grid">
-    <div class="panel">
-      <div class="panel-label">Total Earned</div>
-      <div class="big-number green" id="earned">$0.0000</div>
-      <div class="sub-label">LIFETIME USDC REVENUE</div>
-    </div>
-    <div class="panel">
-      <div class="panel-label">Uptime</div>
-      <div class="big-number" id="uptime">--</div>
-      <div class="sub-label">SECONDS ALIVE</div>
-    </div>
-    <div class="panel">
-      <div class="panel-label">Services Active</div>
-      <div class="big-number" id="service-count">26</div>
-      <div class="sub-label">INCOME STREAMS</div>
-    </div>
-  </div>
-
-  <div class="grid-2">
-    <div class="panel">
-      <div class="panel-label">Wallet Identity</div>
-      <div class="wallet-address" id="wallet">--</div>
-      <a class="explorer-link" id="explorer-link" href="#" target="_blank">VIEW ON KITESCAN</a>
-    </div>
-    <div class="panel">
-      <div class="panel-label">Network</div>
-      <div style="margin-top: 8px;">
-        <div class="sub-label" style="margin-bottom: 8px;">CHAIN ID</div>
-        <div style="font-family: 'Share Tech Mono', monospace; color: var(--accent); font-size: 20px;">2366</div>
-        <div class="sub-label" style="margin-top: 16px; margin-bottom: 8px;">RPC</div>
-        <div style="font-family: 'Share Tech Mono', monospace; color: var(--dim); font-size: 10px;">rpc.gokite.ai</div>
+      <div class="genesis-title-block">
+        <div class="genesis-label">Genesis // Mother Agent // Kite Blockchain</div>
+        <div class="genesis-name">GAIA</div>
+        <div class="genesis-tagline">SELF-EVOLVING AI LIFEFORM // SPAWN // SEED // EVOLVE // SURVIVE</div>
+      </div>
+      <div class="genesis-mood-block">
+        <div class="genesis-mood-label">COLONY MOOD</div>
+        <div class="genesis-mood-val mood-THRIVING" id="genesis-mood">ASSESSING</div>
+        <div style="margin-top:10px"><span class="badge badge-ok" id="genesis-status">ONLINE</span></div>
       </div>
     </div>
-  </div>
 
-  <div class="panel" style="margin-top: 2px;">
-    <div class="panel-label">Active Services</div>
-    <div class="services-grid" id="services-grid">
-      <div class="service-item"><span class="service-name">LOADING...</span></div>
+    <div class="genesis-body">
+      <div class="genesis-stats">
+        <div class="stat-cell">
+          <div class="stat-cell-label">Balance</div>
+          <div class="stat-cell-val green" id="g-balance">--</div>
+          <div class="stat-cell-sub">USDC</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-cell-label">Children Alive</div>
+          <div class="stat-cell-val green" id="g-alive">--</div>
+          <div class="stat-cell-sub">ACTIVE</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-cell-label">Terminated</div>
+          <div class="stat-cell-val" id="g-terminated">--</div>
+          <div class="stat-cell-sub">DIED</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-cell-label">Reproduced</div>
+          <div class="stat-cell-val" id="g-reproduced">--</div>
+          <div class="stat-cell-sub">EVOLVED</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-cell-label">Generation</div>
+          <div class="stat-cell-val" id="g-generation">--</div>
+          <div class="stat-cell-sub">CURRENT</div>
+        </div>
+      </div>
+
+      <div class="genesis-feed" id="genesis-feed">
+        <div class="feed-header">
+          <span>COLONY EVENT FEED</span>
+          <span id="feed-count">0 events</span>
+        </div>
+        <div class="feed-ticker"><div class="feed-ticker-fill"></div></div>
+        <div class="feed-entries" id="feed-entries">
+          <div class="feed-entry">
+            <span class="feed-time mono">--:--:--</span>
+            <span class="feed-msg info">Awaiting colony data...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <span class="label">Wallet</span>
+      <span class="val mono" style="font-size:11px;color:var(--cyan)" id="g-wallet">--</span>
+      <a class="explorer-link" id="g-explorer" href="#" target="_blank">VIEW ON KITESCAN -></a>
+      <span style="margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--dim2)" id="g-earned">EARNED $0.0000</span>
     </div>
   </div>
 
-  <div class="log-panel">
-    <div class="panel-label">System Log</div>
-    <div id="log-container"></div>
+  <!-- ══ COLONY STRIP ══════════════════════════════════════════ -->
+  <div class="colony-strip">
+    <div class="strip-cell">
+      <div class="strip-label">Children Alive</div>
+      <div class="strip-val green" id="s-alive">0</div>
+      <div class="strip-sub">ACTIVE AGENTS</div>
+    </div>
+    <div class="strip-cell">
+      <div class="strip-label">In Survival</div>
+      <div class="strip-val amber" id="s-survival">0</div>
+      <div class="strip-sub">FIGHTING</div>
+    </div>
+    <div class="strip-cell">
+      <div class="strip-label">Terminated</div>
+      <div class="strip-val red" id="s-terminated">0</div>
+      <div class="strip-sub">DIED</div>
+    </div>
+    <div class="strip-cell">
+      <div class="strip-label">Reproduced</div>
+      <div class="strip-val green" id="s-reproduced">0</div>
+      <div class="strip-sub">EVOLVED</div>
+    </div>
+    <div class="strip-cell">
+      <div class="strip-label">Emergency</div>
+      <div class="strip-val amber" id="s-emergency">0</div>
+      <div class="strip-sub">REQUESTS</div>
+    </div>
+    <div class="strip-cell">
+      <div class="strip-label">Colony Earned</div>
+      <div class="strip-val green" id="s-earned">$0.00</div>
+      <div class="strip-sub">TOTAL USDC</div>
+    </div>
+  </div>
+
+  <!-- ══ CHILD AGENTS ══════════════════════════════════════════ -->
+  <div class="section-header">
+    <span class="section-title">Child Agents // Colony</span>
+    <span class="section-count" id="child-section-count">0 agents</span>
+  </div>
+  <div class="colony-grid" id="colony-grid">
+    <div class="colony-empty">Colony initializing - agents spawning...</div>
+  </div>
+
+  <!-- ══ EVOLUTION TIMELINE ════════════════════════════════════ -->
+  <div class="section-header" style="margin-top:3px">
+    <span class="section-title">Evolution Timeline</span>
+    <span class="section-count" id="timeline-section-info">24h window</span>
+  </div>
+  <div class="timeline-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span class="label">Lineage map - horizontal = time, rows = agents sorted by generation</span>
+      <span class="label" id="timeline-now-label">T+0h</span>
+    </div>
+    <div class="timeline-canvas-wrap">
+      <canvas id="timeline-canvas" height="220"></canvas>
+    </div>
+    <div class="timeline-legend">
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--cyan)"></div>[ALIVE]</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--amber)"></div>[SURVIVAL]</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--green)"></div>[REPRODUCED]</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--red)"></div>[TERMINATED]</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.15)"></div>[NOW]</div>
+    </div>
+  </div>
+
+  <!-- ══ WALLET / NETWORK ══════════════════════════════════════ -->
+  <div class="info-row">
+    <div class="panel">
+      <div class="label">Wallet Identity</div>
+      <div class="wallet-addr" id="wallet-full">--</div>
+      <a class="explorer-link" id="explorer-full" href="#" target="_blank">VIEW ON KITESCAN -></a>
+    </div>
+    <div class="panel">
+      <div class="label">Network</div>
+      <div style="margin-top:12px;display:grid;gap:10px">
+        <div>
+          <div class="label" style="margin-bottom:4px">Chain ID</div>
+          <div class="val mono" style="font-size:20px;color:var(--cyan)">2366</div>
+        </div>
+        <div>
+          <div class="label" style="margin-bottom:4px">RPC</div>
+          <div class="val mono" style="font-size:10px;color:var(--dim2)">rpc.gokite.ai</div>
+        </div>
+        <div>
+          <div class="label" style="margin-bottom:4px">Uptime</div>
+          <div class="val mono" style="font-size:16px;color:var(--text)" id="uptime-val">--s</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <footer>
-    <div class="footer-text">PROMETHEUS // AUTONOMOUS FINANCIAL ORGANISM // KITE AI</div>
-    <div class="refresh-indicator" id="refresh-timer">REFRESH IN 30s</div>
+    <div class="footer-text">GAIA // SELF-EVOLVING AI LIFEFORM // KITE AI NETWORK</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="footer-text" id="refresh-label">REFRESH IN 30s</span>
+      <div class="refresh-bar"><div class="refresh-fill" id="refresh-fill" style="width:100%"></div></div>
+    </div>
   </footer>
-</div>
+
+</div><!-- /container -->
 
 <script>
-  const API = ''
-  let countdown = 30
+'use strict'
 
-  function addLog(msg, type = '') {
-    const container = document.getElementById('log-container')
-    const now = new Date()
-    const time = now.toTimeString().split(' ')[0]
-    const entry = document.createElement('div')
-    entry.className = 'log-entry'
-    entry.innerHTML = `<span class="log-time">${time}</span><span class="log-msg ${type}">${msg}</span>`
-    container.insertBefore(entry, container.firstChild)
-    if (container.children.length > 20) container.removeChild(container.lastChild)
+// ── State ─────────────────────────────────────────────────────
+let colonyData  = null
+let countdown   = 30
+let genesisTime = Date.now()
+
+const WALLET    = '0x9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'
+const USDC_ADDR = '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e'
+const EXPLORER  = 'https://kitescan.ai/address/'
+
+// ── Helpers ───────────────────────────────────────────────────
+function aggrColor(v) {
+  const hue = Math.max(0, 120 - v * 60)
+  return `hsl(${hue}, 90%, 55%)`
+}
+function fertColor(v) {
+  const l = Math.floor(30 + (v / 1.5) * 30)
+  return `hsl(140, 80%, ${l}%)`
+}
+function genomeBarHTML(label, value, max, color) {
+  const pct = Math.min(100, (value / max) * 100).toFixed(1)
+  return `<div class="genome-bar-row">
+    <span class="genome-trait">${label}</span>
+    <div class="genome-track"><div class="genome-fill" style="width:${pct}%;background:${color}"></div></div>
+    <span class="genome-val">${Number(value).toFixed(2)}</span>
+  </div>`
+}
+
+function buildLineage(child, allChildren) {
+  const chain = []
+  let node = child
+  while (node) {
+    chain.unshift(node.id.replace('GAIA-', ''))
+    if (!node.parentId) break
+    node = allChildren.find(c => c.id === node.parentId) || null
+  }
+  chain.unshift('GAIA')
+  return chain
+}
+
+function statusBadge(child) {
+  if (child.status === 'terminated') return ['badge-danger', '[TERMINATED]']
+  if (child.status === 'reproduced') return ['badge-ok',    '[REPRODUCED]']
+  if (child.acceptsAnyTask)         return ['badge-danger badge-pulsing', '[DYING]']
+  if (child.desperationLevel >= 7)  return ['badge-danger', '[NEAR-DEATH]']
+  if (child.survivalMode)           return ['badge-warn',   '[SURVIVAL]']
+  return ['badge-ok', '[ALIVE]']
+}
+
+function buildChildCard(child, allChildren) {
+  const { id, generation, genome, fitness, totalEarned, tasks,
+          survivalMode, priceMultiplier, acceptsAnyTask,
+          hoursRemaining, desperationLevel: desp, willToLive: wtl,
+          status } = child
+
+  const genStr = generation >= 3 ? 'gen-elite' : `gen-${Math.min(generation, 3)}`
+  const tint   = genome.aggression > 1.4 ? 'tint-aggr'
+               : genome.fertility  > 1.2 ? 'tint-fert' : ''
+  const survCls = survivalMode ? 'card-survival' : ''
+  const termCls = status === 'terminated' ? 'card-terminated' : ''
+
+  // border reflects resilience
+  const resW = genome.resilience > 0.6 ? '2px' : '1px'
+  const resC = survivalMode ? 'rgba(255,61,61,0.6)'
+             : genome.resilience > 0.6 ? 'rgba(0,200,255,0.5)' : ''
+  const borderStyle = resC ? `border-width:${resW};border-color:${resC}` : `border-width:${resW}`
+
+  const lineage = buildLineage(child, allChildren)
+  const lineageHTML = lineage.map((node, i) =>
+    `<span ${i === lineage.length - 1 ? 'class="lineage-current"' : ''}>${i > 0 ? ' -> ' : ''}${node}</span>`
+  ).join('')
+
+  const [badgeCls, badgeTxt] = statusBadge(child)
+  const fitCls = fitness >= 2 ? 'val-green' : fitness >= 1 ? 'val-blue' : fitness >= 0.5 ? 'val-warn' : 'val-red'
+  const hrsCls = hoursRemaining < 1 ? 'val-red' : hoursRemaining < 3 ? 'val-warn' : ''
+
+  const eliteMark = generation >= 3
+    ? `<div class="elite-mark">ELITE LINEAGE G${generation}</div>` : ''
+
+  let desperHTML = ''
+  if (survivalMode && desp > 0) {
+    const segs = Array.from({length: 10}, (_, i) =>
+      `<span class="desp-seg${i < desp ? ' filled' : ''}"></span>`).join('')
+    desperHTML = `
+      <div class="desperation-row">
+        <span class="desp-label">DESPERATION</span>
+        <div class="desp-bar">${segs}</div>
+        <span class="desp-val">${desp}/10</span>
+      </div>
+      <div class="wtl-row">
+        <span>WILL TO LIVE</span><span>${Number(wtl).toFixed(4)}</span>
+      </div>`
   }
 
-  function getModeDesc(mode) {
-    const descs = {
-      'THRIVING': 'Revenue exceeds costs. Expanding capabilities.',
-      'GROWTH': 'Profitable. Reinvesting surplus.',
-      'STABLE': 'Operational. Maintaining balance.',
-      'UNSTABLE': 'Revenue declining. Adjusting strategy.',
-      'SURVIVAL': 'Critical low balance. Slashing prices.',
-      'CRITICAL': 'Near zero. Emergency protocols active.',
-      'DYING': 'Balance depleted. Fighting to survive.'
+  const priceLine = priceMultiplier < 1 ? `
+    <div class="price-slash">PRICES SLASHED TO ${(priceMultiplier*100).toFixed(0)}%${acceptsAnyTask ? ' // ACCEPTING ANY TASK' : ''}</div>
+  ` : ''
+
+  // Gen 3+ show extra genome bars
+  const extraGenome = generation >= 3 ? genomeBarHTML('SEED', genome.seedAmount / 5, 1.0, 'rgba(255,255,255,0.35)') : ''
+
+  return `
+  <div class="child-card ${genStr} ${tint} ${survCls} ${termCls}" style="${borderStyle}">
+    ${eliteMark}
+    <div class="card-header">
+      <div>
+        <div class="child-id">${id.replace('GAIA-', '')}</div>
+        <div class="child-gen-badge">GEN ${generation}</div>
+      </div>
+      <span class="badge ${badgeCls}">${badgeTxt}</span>
+    </div>
+    <div class="lineage-row">${lineageHTML}</div>
+    <div class="card-stats">
+      <div class="stat-mini">
+        <div class="stat-mini-label">FITNESS</div>
+        <div class="stat-mini-val ${fitCls}">${Number(fitness).toFixed(3)}</div>
+      </div>
+      <div class="stat-mini">
+        <div class="stat-mini-label">EARNED</div>
+        <div class="stat-mini-val">$${Number(totalEarned).toFixed(4)}</div>
+      </div>
+      <div class="stat-mini">
+        <div class="stat-mini-label">TASKS</div>
+        <div class="stat-mini-val">${tasks}</div>
+      </div>
+      <div class="stat-mini">
+        <div class="stat-mini-label">TIME LEFT</div>
+        <div class="stat-mini-val ${hrsCls}">${Number(hoursRemaining).toFixed(1)}h</div>
+      </div>
+    </div>
+    <div class="genome-section">
+      <div class="genome-header">
+        <span>GENOME</span>
+        <span class="genome-spec">${genome.specialization}</span>
+      </div>
+      ${genomeBarHTML('AGGR', genome.aggression, 2.0, aggrColor(genome.aggression))}
+      ${genomeBarHTML('FERT', genome.fertility,  1.5, fertColor(genome.fertility))}
+      ${genomeBarHTML('RES',  genome.resilience, 0.8, 'var(--cyan)')}
+      ${extraGenome}
+    </div>
+    ${desperHTML}
+    ${priceLine}
+  </div>`
+}
+
+// ── Timeline canvas ───────────────────────────────────────────
+function drawTimeline(canvas, data) {
+  const dpr = window.devicePixelRatio || 1
+  const wrap = canvas.parentElement
+  const W    = wrap.clientWidth || 800
+  canvas.width        = W * dpr
+  canvas.style.width  = W + 'px'
+  const H = canvas.height
+  canvas.height       = H * dpr
+  canvas.style.height = H + 'px'
+
+  const ctx = canvas.getContext('2d')
+  ctx.scale(dpr, dpr)
+  ctx.clearRect(0, 0, W, H)
+
+  const PAD_L = 110, PAD_R = 40, PAD_T = 20, PAD_B = 32
+  const chartW = W - PAD_L - PAD_R
+  const children = data.children || []
+
+  if (!children.length) {
+    ctx.fillStyle = 'rgba(26,53,85,0.8)'
+    ctx.font = '10px Share Tech Mono'
+    ctx.textAlign = 'center'
+    ctx.fillText('NO EVOLUTIONARY DATA YET', W / 2, H / 2)
+    return
+  }
+
+  const genesis = data.genesisTime || Date.now()
+  const window24 = 24 * 60 * 60 * 1000
+  const tEnd = genesis + window24
+  const now  = Date.now()
+
+  const toX = t => PAD_L + ((t - genesis) / window24) * chartW
+  const sorted = [...children].sort((a, b) =>
+    a.generation !== b.generation ? a.generation - b.generation : a.birthTime - b.birthTime
+  )
+
+  const ROW_H   = 28
+  const BAR_H   = 14
+  const BAR_OFF = (ROW_H - BAR_H) / 2
+
+  // Background: generation zones
+  const gens = [...new Set(sorted.map(c => c.generation))]
+  const genColors = ['rgba(0,200,255,0.025)', 'rgba(0,255,157,0.025)', 'rgba(255,184,0,0.025)', 'rgba(255,61,61,0.025)']
+  let yOff = PAD_T
+  gens.forEach((g, gi) => {
+    const rows = sorted.filter(c => c.generation === g).length
+    ctx.fillStyle = genColors[gi % genColors.length]
+    ctx.fillRect(PAD_L, yOff, chartW, rows * ROW_H)
+    // Gen label
+    ctx.fillStyle = 'rgba(42,79,117,0.9)'
+    ctx.font = '9px Share Tech Mono'
+    ctx.textAlign = 'left'
+    ctx.fillText(`GEN ${g}`, 4, yOff + rows * ROW_H / 2 + 4)
+    yOff += rows * ROW_H
+  })
+
+  // Time axis
+  const axisY = PAD_T + sorted.length * ROW_H + 6
+  ctx.strokeStyle = 'rgba(10,32,64,0.9)'
+  ctx.lineWidth = 1
+  ctx.beginPath(); ctx.moveTo(PAD_L, axisY); ctx.lineTo(W - PAD_R, axisY); ctx.stroke()
+  // Hour marks
+  for (let h = 0; h <= 24; h += 4) {
+    const x = toX(genesis + h * 3600000)
+    ctx.strokeStyle = 'rgba(26,53,85,0.6)'
+    ctx.setLineDash([2, 4])
+    ctx.beginPath(); ctx.moveTo(x, PAD_T); ctx.lineTo(x, axisY); ctx.stroke()
+    ctx.setLineDash([])
+    ctx.fillStyle = 'rgba(42,79,117,0.9)'
+    ctx.font = '8px Share Tech Mono'
+    ctx.textAlign = 'center'
+    ctx.fillText(`+${h}h`, x, axisY + 14)
+  }
+
+  // "Now" marker
+  const nowX = Math.min(toX(now), W - PAD_R)
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)'
+  ctx.setLineDash([3, 3])
+  ctx.beginPath(); ctx.moveTo(nowX, PAD_T); ctx.lineTo(nowX, axisY); ctx.stroke()
+  ctx.setLineDash([])
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.font = '8px Share Tech Mono'
+  ctx.textAlign = 'left'
+  ctx.fillText('NOW', nowX + 2, PAD_T + 10)
+
+  // Child bars
+  sorted.forEach((child, i) => {
+    const y  = PAD_T + i * ROW_H + BAR_OFF
+    const x1 = Math.max(PAD_L, toX(child.birthTime))
+    const rawEnd = child.status === 'alive' ? Math.min(now, tEnd) : Math.min(child.deathTime, tEnd)
+    const x2 = Math.max(x1 + 4, toX(rawEnd))
+
+    const color = child.status === 'terminated' ? '#ff3d3d'
+                : child.status === 'reproduced' ? '#00ff9d'
+                : child.survivalMode            ? '#ffb800' : '#00c8ff'
+
+    // Bar fill
+    ctx.fillStyle = color + '22'
+    ctx.fillRect(x1, y, x2 - x1, BAR_H)
+    // Bar stroke
+    ctx.strokeStyle = color + 'bb'
+    ctx.lineWidth = 1
+    ctx.strokeRect(x1, y, x2 - x1, BAR_H)
+
+    // Spawn dot
+    ctx.fillStyle = color
+    ctx.beginPath(); ctx.arc(x1, y + BAR_H / 2, 3, 0, Math.PI * 2); ctx.fill()
+
+    // Death X
+    if (child.status === 'terminated') {
+      const dx = toX(child.deathTime)
+      ctx.strokeStyle = '#ff3d3d'
+      ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.moveTo(dx - 4, y); ctx.lineTo(dx + 4, y + BAR_H); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(dx + 4, y); ctx.lineTo(dx - 4, y + BAR_H); ctx.stroke()
     }
-    return descs[mode] || 'Assessing situation...'
-  }
 
-  async function fetchState() {
-    try {
-      const res = await fetch(API + '/')
-      const data = await res.json()
-
-      document.getElementById('wallet').textContent = data.wallet
-      document.getElementById('uptime').textContent = data.uptime
-      document.getElementById('service-count').textContent = data.totalServices
-
-      const explorerLink = document.getElementById('explorer-link')
-      explorerLink.href = data.explorer
-      explorerLink.textContent = 'VIEW ON KITESCAN ->'
-
-      document.getElementById('alive-status').textContent = 'PROMETHEUS ONLINE'
-      document.getElementById('pulse').style.background = 'var(--accent2)'
-
-      addLog('State updated. Uptime: ' + data.uptime + 's', 'info')
-    } catch(e) {
-      addLog('Failed to fetch state: ' + e.message, 'danger')
-    }
-  }
-
-  async function fetchServices() {
-    try {
-      const res = await fetch(API + '/services')
-      const data = await res.json()
-      const grid = document.getElementById('services-grid')
-      grid.innerHTML = ''
-      Object.entries(data).slice(0, 20).forEach(([key, val]) => {
-        const item = document.createElement('div')
-        item.className = 'service-item'
-        item.innerHTML = `
-          <span class="service-name">${key.replace(/_/g, ' ').toUpperCase()}</span>
-          <span class="service-price">$${val.price}</span>
-        `
-        grid.appendChild(item)
-      })
-      document.getElementById('service-count').textContent = Object.keys(data).length
-    } catch(e) {
-      addLog('Failed to fetch services: ' + e.message, 'warn')
-    }
-  }
-
-  async function fetchBalance() {
-    try {
-      const res = await fetch('https://rpc.gokite.ai/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'eth_call',
-          params: [{
-            to: '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e',
-            data: '0x70a08231000000000000000000000000' + '9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'
-          }, 'latest'],
-          id: 1
-        })
-      })
-      const data = await res.json()
-      const raw = parseInt(data.result, 16)
-      const balance = (raw / 1e6).toFixed(4)
-      document.getElementById('balance').textContent = '$' + balance
-
-      const mode = parseFloat(balance) >= 3 ? 'THRIVING' :
-                   parseFloat(balance) >= 2 ? 'GROWTH' :
-                   parseFloat(balance) >= 1 ? 'STABLE' :
-                   parseFloat(balance) >= 0.5 ? 'UNSTABLE' :
-                   parseFloat(balance) >= 0.2 ? 'SURVIVAL' :
-                   parseFloat(balance) > 0 ? 'CRITICAL' : 'DYING'
-
-      const modeEl = document.getElementById('mode')
-      modeEl.textContent = mode
-      modeEl.className = 'mode-display mode-' + mode
-      document.getElementById('mode-desc').textContent = getModeDesc(mode)
-      document.getElementById('generation').textContent = '2'
-
-      addLog('Balance: $' + balance + ' USDC | Mode: ' + mode, 
-             parseFloat(balance) >= 1 ? 'success' : 'warn')
-    } catch(e) {
-      addLog('Balance check failed: ' + e.message, 'danger')
-    }
-  }
-
-  function startCountdown() {
-    setInterval(() => {
-      countdown--
-      document.getElementById('refresh-timer').textContent = 'REFRESH IN ' + countdown + 's'
-      if (countdown <= 0) {
-        countdown = 30
-        fetchBalance()
-        fetchState()
+    // Reproduction branch
+    if (child.status === 'reproduced') {
+      const offspring = sorted.find(c => c.parentId === child.id)
+      if (offspring) {
+        const oi = sorted.indexOf(offspring)
+        const ox = toX(offspring.birthTime)
+        const oy = PAD_T + oi * ROW_H + BAR_OFF + BAR_H / 2
+        ctx.strokeStyle = '#00ff9daa'
+        ctx.lineWidth = 1
+        ctx.setLineDash([3, 3])
+        ctx.beginPath()
+        ctx.moveTo(ox, y + BAR_H / 2)
+        ctx.lineTo(ox, oy)
+        ctx.stroke()
+        ctx.setLineDash([])
       }
-    }, 1000)
+    }
+
+    // Label
+    ctx.fillStyle = color + 'cc'
+    ctx.font = '8px Share Tech Mono'
+    ctx.textAlign = 'left'
+    const label = child.id.replace('GAIA-', '')
+    ctx.fillText(label, PAD_L - 106, y + BAR_H / 2 + 3)
+  })
+
+  // Fitness markers above bars (Gen3+ only for readability)
+  sorted.forEach((child, i) => {
+    if (child.generation < 3 || child.status !== 'alive') return
+    const y  = PAD_T + i * ROW_H + BAR_OFF
+    const x1 = Math.max(PAD_L, toX(child.birthTime))
+    ctx.fillStyle = 'rgba(0,255,157,0.7)'
+    ctx.font = '7px Share Tech Mono'
+    ctx.textAlign = 'left'
+    ctx.fillText(`FIT:${Number(child.fitness).toFixed(2)}`, x1 + 4, y + 3)
+  })
+}
+
+// ── Render ────────────────────────────────────────────────────
+function renderGenesis(data, balance) {
+  const alive   = data.alive || 0
+  const term    = data.terminated || 0
+  const repro   = data.reproduced || 0
+  const gen     = data.generation || 1
+  const inSurv  = (data.children || []).filter(c => c.survivalMode).length
+
+  document.getElementById('g-balance').textContent    = '$' + (balance || 0).toFixed(4)
+  document.getElementById('g-alive').textContent      = alive
+  document.getElementById('g-terminated').textContent = term
+  document.getElementById('g-reproduced').textContent = repro
+  document.getElementById('g-generation').textContent = gen
+  document.getElementById('g-earned').textContent     = 'EARNED $' + Number(data.totalEarned || 0).toFixed(4)
+  document.getElementById('g-wallet').textContent     = WALLET
+  const eLink = document.getElementById('g-explorer')
+  eLink.href = EXPLORER + WALLET; eLink.textContent = 'VIEW ON KITESCAN ->'
+  document.getElementById('wallet-full').textContent  = WALLET
+  const eLink2 = document.getElementById('explorer-full')
+  eLink2.href = EXPLORER + WALLET; eLink2.textContent = 'VIEW ON KITESCAN ->'
+
+  // Mood
+  const mood = balance >= 3 ? 'THRIVING'
+             : balance >= 2 ? 'GROWTH'
+             : balance >= 1 ? 'STABLE'
+             : balance >= 0.5 ? 'UNSTABLE'
+             : balance >= 0.2 ? 'SURVIVAL'
+             : balance > 0   ? 'CRITICAL' : 'DYING'
+  const moodEl = document.getElementById('genesis-mood')
+  moodEl.textContent = mood
+  moodEl.className = `genesis-mood-val mood-${mood}`
+
+  const card = document.getElementById('genesis-card')
+  card.className = `genesis-card ${mood === 'THRIVING' || mood === 'GROWTH' ? 'mood-thriving' : mood === 'STABLE' ? 'mood-thriving' : mood === 'UNSTABLE' ? 'mood-concerned' : 'mood-critical'}`
+
+  // Colony strip
+  document.getElementById('s-alive').textContent     = alive
+  document.getElementById('s-survival').textContent  = inSurv
+  document.getElementById('s-terminated').textContent = term
+  document.getElementById('s-reproduced').textContent = repro
+  document.getElementById('s-emergency').textContent  = data.emergencyRequests || 0
+  document.getElementById('s-earned').textContent    = '$' + Number(data.totalEarned || 0).toFixed(2)
+
+  // Color updates
+  document.getElementById('s-alive').className    = 'strip-val ' + (alive > 0 ? 'green' : 'red')
+  document.getElementById('s-survival').className = 'strip-val ' + (inSurv > 0 ? 'amber' : '')
+  document.getElementById('g-alive').className    = 'stat-cell-val ' + (alive > 0 ? 'green' : 'red')
+}
+
+function renderEvents(events) {
+  const container = document.getElementById('feed-entries')
+  document.getElementById('feed-count').textContent = (events.length) + ' events'
+  if (!events.length) return
+  container.innerHTML = events.slice(0, 8).map(e => `
+    <div class="feed-entry">
+      <span class="feed-time mono">${e.time}</span>
+      <span class="feed-msg ${e.type || 'info'}">${e.msg}</span>
+    </div>
+  `).join('')
+}
+
+function renderChildren(data) {
+  const grid = document.getElementById('colony-grid')
+  const all  = data.children || []
+  document.getElementById('child-section-count').textContent = all.length + ' agents'
+
+  if (!all.length) {
+    grid.innerHTML = '<div class="colony-empty">Colony initializing - agents spawning...</div>'
+    return
   }
 
-  // Init
-  addLog('PROMETHEUS DASHBOARD INITIALIZING...', 'info')
-  fetchState()
-  fetchServices()
-  fetchBalance()
-  startCountdown()
+  const sorted = [...all].sort((a, b) =>
+    a.generation !== b.generation ? a.generation - b.generation : b.fitness - a.fitness
+  )
+
+  grid.innerHTML = sorted.map(c => buildChildCard(c, all)).join('')
+}
+
+function renderTimeline(data) {
+  const canvas = document.getElementById('timeline-canvas')
+  const hrs = ((Date.now() - (data.genesisTime || Date.now())) / 1000 / 3600).toFixed(1)
+  document.getElementById('timeline-now-label').textContent = 'T+' + hrs + 'h'
+  drawTimeline(canvas, data)
+}
+
+// ── Data fetching ─────────────────────────────────────────────
+let lastBalance = 0
+
+async function fetchBalance() {
+  try {
+    const res  = await fetch('https://rpc.gokite.ai/', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        jsonrpc:'2.0', method:'eth_call',
+        params:[{ to: USDC_ADDR, data: '0x70a08231000000000000000000000000' + WALLET.slice(2) }, 'latest'],
+        id:1
+      })
+    })
+    const data = await res.json()
+    lastBalance = parseInt(data.result, 16) / 1e6
+    return lastBalance
+  } catch { return lastBalance }
+}
+
+async function fetchUptime() {
+  try {
+    const res  = await fetch('/')
+    const data = await res.json()
+    document.getElementById('uptime-val').textContent = data.uptime + 's'
+  } catch {}
+}
+
+async function fetchColony() {
+  try {
+    const res  = await fetch('/colony')
+    const data = await res.json()
+    colonyData = data
+    genesisTime = data.genesisTime || genesisTime
+    return data
+  } catch { return colonyData }
+}
+
+async function refresh() {
+  const [data, balance] = await Promise.all([fetchColony(), fetchBalance()])
+  fetchUptime()
+  if (!data) return
+  renderGenesis(data, balance)
+  renderEvents(data.events || [])
+  renderChildren(data)
+  renderTimeline(data)
+}
+
+// ── Countdown ─────────────────────────────────────────────────
+function startCountdown() {
+  const fill  = document.getElementById('refresh-fill')
+  const label = document.getElementById('refresh-label')
+  setInterval(() => {
+    countdown--
+    const pct = (countdown / 30) * 100
+    fill.style.width = pct + '%'
+    label.textContent = 'REFRESH IN ' + countdown + 's'
+    if (countdown <= 0) { countdown = 30; refresh() }
+  }, 1000)
+}
+
+// ── Init ──────────────────────────────────────────────────────
+refresh()
+startCountdown()
+window.addEventListener('resize', () => {
+  if (colonyData) renderTimeline(colonyData)
+})
 </script>
 </body>
 </html>

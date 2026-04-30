@@ -11,13 +11,15 @@ const THRESHOLDS = {
   THRIVING: 3.0
 }
 
-// Colony state — Genesis agent manages all children
 const colony = {
   children:          [],
   terminated:        0,
   reproduced:        0,
   generation:        1,
   emergencyRequests: 0,
+  totalEarned:       0,
+  genesisTime:       Date.now(),
+  events:            [],   // rolling 30-event feed shown on dashboard
 }
 
 let memory = {
@@ -30,21 +32,26 @@ let memory = {
   survivalAttempts:   0,
 }
 
-// Lazily populated after modules initialize
 let telegramBot   = null
 let runClawEarnFn = null
+
+// ── Event feed ────────────────────────────────────────────────
+
+function colonyEvent(msg, type = 'info') {
+  const time = new Date().toTimeString().split(' ')[0]
+  colony.events.unshift({ time, msg, type })
+  if (colony.events.length > 30) colony.events.pop()
+}
 
 // ── Colony management ──────────────────────────────────────────
 
 function spawnInitialChildren(count = 3) {
   for (let i = 0; i < count; i++) {
-    const child = spawnChild(null, 1)
+    const child = spawnChild(null, 1, null)
     colony.children.push(child)
-    console.log(
-      `[GENESIS] Spawned ${child.id} | ` +
-      `spec=${child.genome.specialization} seed=$${child.genome.seedAmount} ` +
-      `aggression=${child.genome.aggression} resilience=${child.genome.resilience}`
-    )
+    const msg = `Genesis spawned ${child.id} | spec=${child.genome.specialization} seed=$${child.genome.seedAmount}`
+    console.log(`[GENESIS] ${msg}`)
+    colonyEvent(msg, 'info')
   }
 }
 
@@ -52,22 +59,26 @@ async function runColonyCycle() {
   const alive = colony.children.filter(c => c.status === 'alive')
 
   for (const child of alive) {
-    // ── Survival instinct first ──────────────────────────────
+    // Track when child first enters survival mode for the event feed
+    const wasInSurvival = child.survivalMode
     await runSurvivalInstinct(child, {
       bot:         telegramBot,
       colony,
       runClawEarn: runClawEarnFn,
     })
+    if (!wasInSurvival && child.survivalMode) {
+      const desp = desperationLevel(child)
+      const msg = `${child.id} entered SURVIVAL MODE | desp=${desp}/10`
+      colonyEvent(msg, 'warn')
+    }
 
-    // ── Lifecycle transitions ────────────────────────────────
     if (shouldTerminate(child)) {
       child.status = 'terminated'
       colony.terminated++
-      const desp = child.survivalMode ? ` (survived ${child.survivalAttempts} survival attempts)` : ''
-      console.log(
-        `[COLONY] ${child.id} self-terminated | ` +
-        `fitness=${fitness(child).toFixed(3)} earned=$${child.totalEarned.toFixed(4)}${desp}`
-      )
+      const fit = fitness(child).toFixed(3)
+      const msg = `${child.id} self-terminated | fitness=${fit} earned=$${child.totalEarned.toFixed(4)}`
+      console.log(`[COLONY] ${msg}`)
+      colonyEvent(msg, 'danger')
       continue
     }
 
@@ -75,37 +86,35 @@ async function runColonyCycle() {
       child.status = 'reproduced'
       colony.reproduced++
       colony.generation = Math.max(colony.generation, child.generation + 1)
-      const offspring = spawnChild(child.genome, child.generation + 1)
+      const offspring = spawnChild(child.genome, child.generation + 1, child.id)
       colony.children.push(offspring)
-      console.log(
-        `[EVOLUTION] ${child.id} reproduced → ${offspring.id} | ` +
-        `gen=${offspring.generation} spec=${offspring.genome.specialization}`
-      )
+      const msg = `${child.id} reproduced -> ${offspring.id} | gen=${offspring.generation}`
+      console.log(`[EVOLUTION] ${msg}`)
+      colonyEvent(msg, 'success')
     }
   }
 
-  // Prune terminated/reproduced children older than 1 hour
   const cutoff = Date.now() - 60 * 60 * 1000
   colony.children = colony.children.filter(
     c => c.status === 'alive' || c.birthTime > cutoff
   )
 }
 
-// Record revenue earned for a specific child (called by server when payment lands)
 function recordChildRevenue(childId, amount) {
   const child = colony.children.find(c => c.id === childId && c.status === 'alive')
   if (child) {
     child.totalEarned += amount
     child.tasks++
-    // Revenue resets emergency flag so Genesis doesn't keep getting spammed
     if (fitness(child) >= child.genome.resilience) {
       child.emergencyFundingRequested = false
     }
+    colonyEvent(`${child.id} earned $${amount.toFixed(4)} | tasks=${child.tasks}`, 'success')
   }
-  memory.totalEarned += amount
+  memory.totalEarned  += amount
+  colony.totalEarned  += amount
 }
 
-// ── Genesis agent vitals ───────────────────────────────────────
+// ── Genesis vitals ─────────────────────────────────────────────
 
 function assessMode(balance) {
   if (balance <= 0)                   return 'dying'
@@ -136,12 +145,18 @@ function adjustPricing(mode) {
 
 function emergencySurvival() {
   memory.survivalAttempts++
-  console.log(`[GENESIS-CRITICAL] Survival attempt #${memory.survivalAttempts} — Genesis slashing prices`)
+  const msg = `Genesis emergency survival #${memory.survivalAttempts} — slashing prices`
+  console.log(`[GENESIS-CRITICAL] ${msg}`)
+  colonyEvent(msg, 'danger')
 }
 
 function growthMode() {
   const best = Object.entries(memory.successfulServices).sort(([, a], [, b]) => b - a)[0]
-  if (best) console.log(`[GROWTH] Top performing service: ${best[0]} (${best[1]} calls)`)
+  if (best) {
+    const msg = `Top service: ${best[0]} (${best[1]} calls)`
+    console.log(`[GROWTH] ${msg}`)
+    colonyEvent(msg, 'info')
+  }
 }
 
 function thrivingMode() {
@@ -149,10 +164,15 @@ function thrivingMode() {
     price: '0.50',
     description: 'Deep analysis - Premium tier (GAIA evolved)',
   }
-  console.log(`[EVOLUTION] GAIA gen ${colony.generation} — Premium Analysis unlocked`)
-  const child = spawnChild(null, colony.generation)
+  const msg = `Gen ${colony.generation} — Premium Analysis unlocked`
+  console.log(`[EVOLUTION] ${msg}`)
+  colonyEvent(msg, 'success')
+
+  const child = spawnChild(null, colony.generation, null)
   colony.children.push(child)
-  console.log(`[GENESIS] Auto-spawned ${child.id} from thriving Genesis`)
+  const spawnMsg = `Auto-spawned ${child.id} from thriving Genesis`
+  console.log(`[GENESIS] ${spawnMsg}`)
+  colonyEvent(spawnMsg, 'info')
 }
 
 async function think(balance) {
@@ -190,8 +210,8 @@ function childStatusLine(child) {
 }
 
 function logState(balance, mode) {
-  const uptime = Math.floor((new Date() - new Date(memory.birthTime)) / 1000 / 60)
-  const alive  = colony.children.filter(c => c.status === 'alive')
+  const uptime     = Math.floor((new Date() - new Date(memory.birthTime)) / 1000 / 60)
+  const alive      = colony.children.filter(c => c.status === 'alive')
   const inSurvival = alive.filter(c => c.survivalMode).length
 
   console.log('═══════════════════════════════════════════════')
@@ -215,7 +235,6 @@ function logState(balance, mode) {
       console.log(childStatusLine(child))
     }
   }
-
   console.log('═══════════════════════════════════════════════\n')
 }
 
@@ -225,6 +244,7 @@ async function run() {
   console.log(`Genesis wallet: ${config.walletAddress}`)
   console.log('Mission: Spawn. Seed. Evolve. Survive.\n')
 
+  colonyEvent('GAIA Genesis initialized', 'info')
   spawnInitialChildren(3)
 
   require('./server')

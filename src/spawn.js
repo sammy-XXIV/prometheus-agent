@@ -29,13 +29,14 @@ function createGenome(parent = null) {
   }
 }
 
-function spawnChild(parentGenome = null, generation = 1) {
+function spawnChild(parentGenome = null, generation = 1, parentId = null) {
   const id = `GAIA-G${generation}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`
   const genome = createGenome(parentGenome)
   const now = Date.now()
   return {
     id,
     generation,
+    parentId,
     genome,
     status: 'alive',
     birthTime: now,

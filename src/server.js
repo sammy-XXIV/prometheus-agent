@@ -120,6 +120,55 @@ app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, '../src/dashboard.html'))
 })
 
+// Colony state — full live data for the dashboard
+app.get('/colony', (req, res) => {
+  try {
+    const { colony } = require('./gaia')
+    const spawnMod   = require('./spawn')
+    const survMod    = require('./survival')
+
+    const children = colony.children.map(child => {
+      const fit  = spawnMod.fitness(child)
+      const hrs  = parseFloat((spawnMod.timeRemaining(child) / 1000 / 3600).toFixed(2))
+      const desp = child.survivalMode ? survMod.desperationLevel(child) : 0
+      const wtl  = child.survivalMode ? survMod.willToLive(child) : 0
+      return {
+        id:                       child.id,
+        generation:               child.generation,
+        parentId:                 child.parentId || null,
+        status:                   child.status,
+        birthTime:                child.birthTime,
+        deathTime:                child.deathTime,
+        fitness:                  parseFloat(fit.toFixed(4)),
+        totalEarned:              child.totalEarned,
+        tasks:                    child.tasks,
+        genome:                   child.genome,
+        survivalMode:             child.survivalMode,
+        priceMultiplier:          child.priceMultiplier,
+        acceptsAnyTask:           child.acceptsAnyTask,
+        emergencyFundingRequested: child.emergencyFundingRequested,
+        hoursRemaining:           hrs,
+        desperationLevel:         desp,
+        willToLive:               wtl,
+      }
+    })
+
+    res.json({
+      genesisTime:       colony.genesisTime,
+      generation:        colony.generation,
+      totalEarned:       colony.totalEarned || 0,
+      alive:             colony.children.filter(c => c.status === 'alive').length,
+      terminated:        colony.terminated,
+      reproduced:        colony.reproduced,
+      emergencyRequests: colony.emergencyRequests || 0,
+      events:            colony.events || [],
+      children,
+    })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // Free endpoints
 app.get('/', (req, res) => {
   res.json({
