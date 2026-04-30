@@ -1,0 +1,11 @@
+{
+  "sessions": {
+    "agent_session_req_019ddbe7-2405-7353-b3ca-a4179f4bb6e8": {
+      "state": "pending",
+      "request_id": "agent_session_req_019ddbe7-2405-7353-b3ca-a4179f4bb6e8",
+      "private_key": "0x4537d220c254af70938da7f882ccb5fa77ba7de938798d05c6cf2c2b28228173",
+      "created_at": "2026-04-30T01:00:51Z",
+      "approval_url": "https://agentpassport.ai/agent-session/approve?token=asr_EowLDPC_I0_8wHtRp_a2mt9dizxqs67gCN4R6yVb55w"
+    }
+  }
+}
