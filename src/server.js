@@ -6,6 +6,8 @@ const services = require('./services')
 const verifyPayment = require('./verify')
 
 const app = express()
+const cors = require('cors')
+app.use(cors())
 app.use(express.json())
 
 function paymentWall(serviceKey) {
