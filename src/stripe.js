@@ -1,10 +1,13 @@
 require('dotenv').config()
-const Stripe  = require('stripe')
-const crypto  = require('crypto')
-const config  = require('./config')
+const Stripe   = require('stripe')
+const crypto   = require('crypto')
+const config   = require('./config')
 const services = require('./services')
 
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY)
+const STRIPE_ENABLED = !!process.env.STRIPE_SECRET_KEY
+if (!STRIPE_ENABLED) console.log('[STRIPE] STRIPE_SECRET_KEY not set — card payments disabled')
+
+const stripe = STRIPE_ENABLED ? Stripe(process.env.STRIPE_SECRET_KEY) : null
 
 // In-memory store: pendingId → {service, input, status, result}
 // Each entry lives for 2 hours then is GC'd
@@ -18,6 +21,7 @@ function storePending(service, input) {
 }
 
 async function createCheckoutSession(serviceKey, input) {
+  if (!STRIPE_ENABLED) throw new Error('Card payments not configured — set STRIPE_SECRET_KEY')
   const service = config.services[serviceKey]
   if (!service) throw new Error(`Unknown service: ${serviceKey}`)
 
@@ -107,6 +111,7 @@ async function fulfil(pendingId) {
 
 // Verify and process incoming Stripe webhook
 async function handleWebhook(rawBody, sig) {
+  if (!STRIPE_ENABLED) return { error: 'Stripe not configured' }
   const secret = process.env.STRIPE_WEBHOOK_SECRET
   let event
 
@@ -136,6 +141,7 @@ async function handleWebhook(rawBody, sig) {
 
 // Retrieve result for a Stripe session (used by success_url redirect)
 async function getResultForSession(sessionId) {
+  if (!STRIPE_ENABLED) return { status: 'error', error: 'Stripe not configured' }
   let session
   try {
     session = await stripe.checkout.sessions.retrieve(sessionId)
