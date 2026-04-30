@@ -62,7 +62,6 @@ async function runColonyCycle() {
     // Track when child first enters survival mode for the event feed
     const wasInSurvival = child.survivalMode
     await runSurvivalInstinct(child, {
-      bot:         telegramBot,
       colony,
       runClawEarn: runClawEarnFn,
     })

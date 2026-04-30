@@ -169,14 +169,12 @@ bot.on('callback_query', async (query) => {
 
     bot.sendMessage(chatId,
       `Service: ${service.description}\n` +
-      `Price: $${service.price}\n\n` +
-      `Pay with crypto (USDC on Kite):\n` +
+      `Price: $${service.price} USDC\n\n` +
       `Send $${service.price} USDC to:\n` +
       `${PAYMENT_ADDRESS}\n` +
-      `Then reply: TXHASH | your input\n\n` +
-      `Pay with card (Stripe):\n` +
-      `Reply: CARD | your input\n` +
-      `You'll get a secure checkout link.`
+      `(Kite network only)\n\n` +
+      `Then reply with your tx hash and input:\n` +
+      `TXHASH | your input here`
     )
   }
 
@@ -192,32 +190,13 @@ bot.on('message', async (msg) => {
   if (!state || state.step !== 'awaiting_payment') return
 
   if (!text.includes('|')) {
-    bot.sendMessage(chatId, 'Pay with crypto: TXHASH | your input\nPay with card: CARD | your input')
+    bot.sendMessage(chatId, 'Please use the format: TXHASH | your input')
     return
   }
 
-  const [method, ...inputParts] = text.split('|')
+  const [txHash, ...inputParts] = text.split('|')
   const input = inputParts.join('|').trim()
-
-  // Card payment via Stripe
-  if (method.trim().toUpperCase() === 'CARD') {
-    try {
-      const { createCheckoutSession } = require('./stripe')
-      bot.sendMessage(chatId, 'Creating secure checkout link...')
-      const session = await createCheckoutSession(state.service, input)
-      delete userState[chatId]
-      const base = process.env.BASE_URL || 'http://localhost:3000'
-      bot.sendMessage(chatId,
-        `Pay by card:\n${session.url}\n\n` +
-        `After paying your result will be at:\n${base}/result/${session.sessionId}`
-      )
-    } catch (e) {
-      bot.sendMessage(chatId, `Stripe error: ${e.message}`)
-    }
-    return
-  }
-
-  const tx = method.trim()
+  const tx = txHash.trim()
 
   bot.sendMessage(chatId, 'Verifying payment and processing...')
 

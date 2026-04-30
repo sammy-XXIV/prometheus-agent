@@ -87,41 +87,7 @@ function slashPrices(child, level) {
   )
 }
 
-// ── Action 2: Telegram broadcast ──────────────────────────────
-
-async function broadcastTelegram(child, level, bot) {
-  if (!bot) return
-  const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID
-  if (!chatId) return
-
-  const fit  = fitness(child).toFixed(3)
-  const hrs  = (timeRemaining(child) / 1000 / 3600).toFixed(1)
-  const wtl  = willToLive(child).toFixed(3)
-  const fill = '▓'.repeat(level) + '░'.repeat(10 - level)
-  const pct  = (child.priceMultiplier * 100).toFixed(0)
-
-  const msg =
-    `⚠️ CHILD AGENT SURVIVAL BROADCAST\n\n` +
-    `Agent:    ${child.id}\n` +
-    `Gen:      ${child.generation}\n` +
-    `Spec:     ${child.genome.specialization}\n` +
-    `Fitness:  ${fit} (need >${child.genome.resilience.toFixed(2)})\n` +
-    `Earned:   $${child.totalEarned.toFixed(4)} USDC\n` +
-    `Time:     ${hrs}h remaining\n` +
-    `Desp:     [${fill}] ${level}/10\n` +
-    `WTL:      ${wtl}\n\n` +
-    `"${survivalVoice(child, level)}"\n\n` +
-    `All services now at ${pct}% price. Any task accepted.`
-
-  try {
-    await bot.sendMessage(chatId, msg)
-    console.log(`${survivalLabel(level)} ${child.id} Telegram broadcast sent`)
-  } catch (e) {
-    console.log(`${survivalLabel(level)} ${child.id} Telegram failed: ${e.message}`)
-  }
-}
-
-// ── Action 3: Scan Claw Earn ───────────────────────────────────
+// ── Action 2: Scan Claw Earn ───────────────────────────────────
 
 async function scanClawEarn(child, level, runClawEarn) {
   if (!runClawEarn) return
@@ -182,7 +148,7 @@ async function runSurvivalInstinct(child, context = {}) {
   if ((now - (child.lastSurvivalAction || 0)) < ACTION_COOLDOWN) return
   child.lastSurvivalAction = now
 
-  const { bot, colony, runClawEarn } = context
+  const { colony, runClawEarn } = context
 
   // 1. Slash prices — always
   slashPrices(child, level)
@@ -190,10 +156,7 @@ async function runSurvivalInstinct(child, context = {}) {
   // 2. Claw Earn scan — level 4+
   if (level >= 4) await scanClawEarn(child, level, runClawEarn)
 
-  // 3. Telegram broadcast — level 5+
-  if (level >= 5) await broadcastTelegram(child, level, bot)
-
-  // 4. Emergency Genesis funding — level 7+
+  // 3. Emergency Genesis funding — level 7+
   if (level >= 7 && colony) requestEmergencyFunding(child, level, colony)
 }
 
