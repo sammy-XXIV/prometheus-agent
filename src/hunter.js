@@ -139,3 +139,14 @@ function startHunter() {
 }
 
 module.exports = startHunter
+
+// Claw Earn integration
+const runClawEarn = require('./clawEarn')
+
+async function huntClawEarn() {
+  await runClawEarn()
+}
+
+// Run Claw Earn every 2 minutes
+setInterval(huntClawEarn, 120000)
+huntClawEarn()
