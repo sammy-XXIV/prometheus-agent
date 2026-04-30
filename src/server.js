@@ -1,5 +1,6 @@
 require('dotenv').config()
 const express = require('express')
+const path = require('path')
 const config = require('./config')
 const services = require('./services')
 const verifyPayment = require('./verify')
@@ -7,7 +8,6 @@ const verifyPayment = require('./verify')
 const app = express()
 app.use(express.json())
 
-// Real on-chain payment verification
 function paymentWall(serviceKey) {
   return async (req, res, next) => {
     const txHash = req.headers['x-payment-tx']
@@ -19,7 +19,7 @@ function paymentWall(serviceKey) {
         accepts: [{
           scheme: 'gokite-aa',
           network: 'kite-mainnet',
-          maxAmountRequired: ethers_units(service.price),
+          maxAmountRequired: String(Math.floor(parseFloat(service.price) * 1e6)),
           resource: `${process.env.BASE_URL || 'http://localhost:3000'}${req.path}`,
           description: service.description,
           payTo: config.walletAddress,
@@ -41,13 +41,12 @@ function paymentWall(serviceKey) {
   }
 }
 
-function ethers_units(price) {
-  return String(Math.floor(parseFloat(price) * 1e6))
-}
+// Dashboard
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, '../src/dashboard.html'))
+})
 
 // Free endpoints
-// root replaced
-app.get('/dashboard', (req, res) => res.sendFile(__dirname + '/../src/dashboard.html'))
 app.get('/', (req, res) => {
   res.json({
     name: 'Prometheus',
