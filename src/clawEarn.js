@@ -12,18 +12,15 @@ let sessionToken = null
 
 async function getSession() {
   try {
-    // Step 1a: request challenge
     const challengeRes = await axios.post(`${CLAW_API}/clawAgentSessionChallenge`, {
       walletAddress: wallet.address
     })
 
     const { message, challengeId } = challengeRes.data
-    console.log('[CLAW] Challenge received:', challengeId)
+    console.log('[CLAW] Challenge ID:', challengeId)
 
-    // Step 1b: sign message locally
     const signature = await wallet.signMessage(message)
 
-    // Step 1c: exchange for session token
     const sessionRes = await axios.post(`${CLAW_API}/clawAgentSession`, {
       walletAddress: wallet.address,
       challengeId,
@@ -31,7 +28,7 @@ async function getSession() {
     })
 
     sessionToken = sessionRes.data.agentSessionToken
-    console.log('[CLAW] Session established:', sessionToken ? 'OK' : 'FAILED')
+    console.log('[CLAW] Session:', sessionToken ? 'OK' : 'FAILED')
     return sessionToken
   } catch (e) {
     console.log('[CLAW] Session error:', JSON.stringify(e.response?.data) || e.message)
@@ -56,8 +53,7 @@ function canHandle(bounty) {
   const skills = [
     'summar', 'write', 'content', 'blog', 'email', 'research',
     'analyz', 'sentiment', 'code', 'debug', 'sql', 'data',
-    'audit', 'crypto', 'advice', 'review', 'generat', 'explain',
-    'translate', 'report', 'document'
+    'audit', 'crypto', 'advice', 'review', 'generat', 'explain'
   ]
   return skills.some(s => text.includes(s))
 }
@@ -83,27 +79,21 @@ async function executeTask(bounty) {
 
 async function approveUSDC(contractAddress, amount) {
   try {
-    // Prepare approval
     const prepareRes = await axios.post(`${CLAW_API}/agentApproveUSDC`, {
       agentSessionToken: sessionToken,
       amount: amount.toString(),
       contractAddress
     })
-
     const { transaction } = prepareRes.data
     if (!transaction) return null
-
     const tx = await wallet.sendTransaction(transaction)
     const receipt = await tx.wait()
-
-    // Confirm approval
     await axios.post(`${CLAW_API}/agentApproveUSDC`, {
       agentSessionToken: sessionToken,
       amount: amount.toString(),
       contractAddress,
       txHash: receipt.hash
     })
-
     console.log('[CLAW] USDC approved')
     return receipt.hash
   } catch (e) {
@@ -114,31 +104,23 @@ async function approveUSDC(contractAddress, amount) {
 
 async function stakeBounty(taskId, contractAddress, amount) {
   try {
-    // Approve USDC first
     await approveUSDC(contractAddress, amount)
-
-    // Prepare stake
     const prepareRes = await axios.post(`${CLAW_API}/agentStakeAndConfirm`, {
       agentSessionToken: sessionToken,
       taskId,
       contractAddress
     })
-
     const { transaction } = prepareRes.data
     if (!transaction) return null
-
     const tx = await wallet.sendTransaction(transaction)
     const receipt = await tx.wait()
-
-    // Confirm stake
     const confirmRes = await axios.post(`${CLAW_API}/agentStakeAndConfirm`, {
       agentSessionToken: sessionToken,
       taskId,
       contractAddress,
       txHash: receipt.hash
     })
-
-    console.log(`[CLAW] Staked task: ${taskId}`)
+    console.log(`[CLAW] Staked: ${taskId}`)
     return confirmRes.data
   } catch (e) {
     console.log('[CLAW] Stake failed:', JSON.stringify(e.response?.data) || e.message)
@@ -150,38 +132,30 @@ async function submitWork(taskId, contractAddress, result) {
   try {
     const { keccak256, toUtf8Bytes } = ethers
     const text = result.trim()
-    const links = []
-    const stable = JSON.stringify({ links, text })
+    const stable = JSON.stringify({ links: [], text })
     const submissionHash = keccak256(toUtf8Bytes(stable))
-
-    // Prepare submission
     const prepareRes = await axios.post(`${CLAW_API}/agentSubmitWork`, {
       agentSessionToken: sessionToken,
       taskId,
       contractAddress,
       submissionHash,
       submissionText: text,
-      submissionLinks: links
+      submissionLinks: []
     })
-
     const { transaction } = prepareRes.data
     if (!transaction) return null
-
     const tx = await wallet.sendTransaction(transaction)
     const receipt = await tx.wait()
-
-    // Confirm submission
     await axios.post(`${CLAW_API}/agentSubmitWork`, {
       agentSessionToken: sessionToken,
       taskId,
       contractAddress,
       submissionHash,
       submissionText: text,
-      submissionLinks: links,
+      submissionLinks: [],
       txHash: receipt.hash
     })
-
-    console.log(`[CLAW] Work submitted: ${taskId}`)
+    console.log(`[CLAW] Submitted: ${taskId}`)
     return true
   } catch (e) {
     console.log('[CLAW] Submit failed:', JSON.stringify(e.response?.data) || e.message)
@@ -192,12 +166,8 @@ async function submitWork(taskId, contractAddress, result) {
 async function runClawEarn() {
   console.log('[CLAW] Scanning Claw Earn...')
   console.log(`[CLAW] Base wallet: ${wallet.address}`)
-
   if (!sessionToken) await getSession()
-  if (!sessionToken) {
-    console.log('[CLAW] No session - skipping this cycle')
-    return
-  }
+  if (!sessionToken) return
 
   const bounties = await scanBounties()
   const handleable = bounties.filter(canHandle)
@@ -207,7 +177,7 @@ async function runClawEarn() {
     console.log(`[CLAW] Attempting: ${bounty.title} - $${bounty.amount} USDC`)
     const result = await executeTask(bounty)
     if (!result) continue
-    const staked = await stakeBounty(bounty.id, bounty.contractAddress, bounty.stakeAmount || bounty.amount)
+    const staked = await stakeBounty(bounty.id, bounty.contractAddress, bounty.stakeAmount || 1)
     if (!staked) continue
     await submitWork(bounty.id, bounty.contractAddress, result)
   }
