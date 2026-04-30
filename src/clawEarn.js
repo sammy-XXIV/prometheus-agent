@@ -9,34 +9,29 @@ const provider = new ethers.JsonRpcProvider(BASE_RPC)
 const wallet = new ethers.Wallet(process.env.PROMETHEUS_BASE_PRIVATE_KEY, provider)
 
 let sessionToken = null
-let sessionWallet = null
 
 async function getSession() {
   try {
-    // Step 1: Get challenge
+    // Step 1a: request challenge
     const challengeRes = await axios.post(`${CLAW_API}/clawAgentSessionChallenge`, {
       walletAddress: wallet.address
     })
 
-    const { message } = challengeRes.data
-    if (!message) {
-      console.log('[CLAW] No message in challenge response:', challengeRes.data)
-      return null
-    }
+    const { message, challengeId } = challengeRes.data
+    console.log('[CLAW] Challenge received:', challengeId)
 
-    // Step 2: Sign message
+    // Step 1b: sign message locally
     const signature = await wallet.signMessage(message)
 
-    // Step 3: Exchange for session token
+    // Step 1c: exchange for session token
     const sessionRes = await axios.post(`${CLAW_API}/clawAgentSession`, {
       walletAddress: wallet.address,
-      signature,
-      message
+      challengeId,
+      signature
     })
 
     sessionToken = sessionRes.data.agentSessionToken
-    sessionWallet = wallet.address
-    console.log('[CLAW] Session established for:', wallet.address)
+    console.log('[CLAW] Session established:', sessionToken ? 'OK' : 'FAILED')
     return sessionToken
   } catch (e) {
     console.log('[CLAW] Session error:', JSON.stringify(e.response?.data) || e.message)
@@ -62,7 +57,7 @@ function canHandle(bounty) {
     'summar', 'write', 'content', 'blog', 'email', 'research',
     'analyz', 'sentiment', 'code', 'debug', 'sql', 'data',
     'audit', 'crypto', 'advice', 'review', 'generat', 'explain',
-    'translate', 'report', 'draft', 'document'
+    'translate', 'report', 'document'
   ]
   return skills.some(s => text.includes(s))
 }
@@ -79,8 +74,6 @@ async function executeTask(bounty) {
     if (text.match(/research|paper/i)) return await services.summarizeResearch(bounty.description)
     if (text.match(/data|interpret/i)) return await services.interpretData(bounty.description)
     if (text.match(/audit|contract/i)) return await services.auditContract(bounty.description)
-    if (text.match(/translate/i)) return await services.advice(`Translate this: ${bounty.description}`)
-    if (text.match(/report|document/i)) return await services.writeBlogPost(bounty.description)
     return await services.advice(bounty.description)
   } catch (e) {
     console.log('[CLAW] Execution failed:', e.message)
@@ -88,38 +81,64 @@ async function executeTask(bounty) {
   }
 }
 
-async function stakeBounty(bountyId, contractAddress) {
+async function approveUSDC(contractAddress, amount) {
   try {
-    // Prepare stake
-    const prepareRes = await axios.post(`${CLAW_API}/agentStakeAndConfirm`, {
-      bountyId,
-      contractAddress,
-      step: 'prepare'
-    }, {
-      headers: { 'x-agent-session-token': sessionToken }
+    // Prepare approval
+    const prepareRes = await axios.post(`${CLAW_API}/agentApproveUSDC`, {
+      agentSessionToken: sessionToken,
+      amount: amount.toString(),
+      contractAddress
     })
 
     const { transaction } = prepareRes.data
-    if (!transaction) {
-      console.log('[CLAW] No transaction in stake prepare:', prepareRes.data)
-      return null
-    }
+    if (!transaction) return null
 
-    // Sign and send transaction
+    const tx = await wallet.sendTransaction(transaction)
+    const receipt = await tx.wait()
+
+    // Confirm approval
+    await axios.post(`${CLAW_API}/agentApproveUSDC`, {
+      agentSessionToken: sessionToken,
+      amount: amount.toString(),
+      contractAddress,
+      txHash: receipt.hash
+    })
+
+    console.log('[CLAW] USDC approved')
+    return receipt.hash
+  } catch (e) {
+    console.log('[CLAW] USDC approve failed:', JSON.stringify(e.response?.data) || e.message)
+    return null
+  }
+}
+
+async function stakeBounty(taskId, contractAddress, amount) {
+  try {
+    // Approve USDC first
+    await approveUSDC(contractAddress, amount)
+
+    // Prepare stake
+    const prepareRes = await axios.post(`${CLAW_API}/agentStakeAndConfirm`, {
+      agentSessionToken: sessionToken,
+      taskId,
+      contractAddress
+    })
+
+    const { transaction } = prepareRes.data
+    if (!transaction) return null
+
     const tx = await wallet.sendTransaction(transaction)
     const receipt = await tx.wait()
 
     // Confirm stake
     const confirmRes = await axios.post(`${CLAW_API}/agentStakeAndConfirm`, {
-      bountyId,
+      agentSessionToken: sessionToken,
+      taskId,
       contractAddress,
-      txHash: receipt.hash,
-      step: 'confirm'
-    }, {
-      headers: { 'x-agent-session-token': sessionToken }
+      txHash: receipt.hash
     })
 
-    console.log(`[CLAW] Staked bounty: ${bountyId}`)
+    console.log(`[CLAW] Staked task: ${taskId}`)
     return confirmRes.data
   } catch (e) {
     console.log('[CLAW] Stake failed:', JSON.stringify(e.response?.data) || e.message)
@@ -127,7 +146,7 @@ async function stakeBounty(bountyId, contractAddress) {
   }
 }
 
-async function submitWork(bountyId, contractAddress, result) {
+async function submitWork(taskId, contractAddress, result) {
   try {
     const { keccak256, toUtf8Bytes } = ethers
     const text = result.trim()
@@ -137,39 +156,33 @@ async function submitWork(bountyId, contractAddress, result) {
 
     // Prepare submission
     const prepareRes = await axios.post(`${CLAW_API}/agentSubmitWork`, {
-      bountyId,
+      agentSessionToken: sessionToken,
+      taskId,
       contractAddress,
-      submission: text,
       submissionHash,
-      step: 'prepare'
-    }, {
-      headers: { 'x-agent-session-token': sessionToken }
+      submissionText: text,
+      submissionLinks: links
     })
 
     const { transaction } = prepareRes.data
-    if (!transaction) {
-      console.log('[CLAW] No transaction in submit prepare:', prepareRes.data)
-      return null
-    }
+    if (!transaction) return null
 
-    // Sign and send
     const tx = await wallet.sendTransaction(transaction)
     const receipt = await tx.wait()
 
     // Confirm submission
-    const confirmRes = await axios.post(`${CLAW_API}/agentSubmitWork`, {
-      bountyId,
+    await axios.post(`${CLAW_API}/agentSubmitWork`, {
+      agentSessionToken: sessionToken,
+      taskId,
       contractAddress,
-      submission: text,
       submissionHash,
-      txHash: receipt.hash,
-      step: 'confirm'
-    }, {
-      headers: { 'x-agent-session-token': sessionToken }
+      submissionText: text,
+      submissionLinks: links,
+      txHash: receipt.hash
     })
 
-    console.log(`[CLAW] Work submitted: ${bountyId}`)
-    return confirmRes.data
+    console.log(`[CLAW] Work submitted: ${taskId}`)
+    return true
   } catch (e) {
     console.log('[CLAW] Submit failed:', JSON.stringify(e.response?.data) || e.message)
     return null
@@ -194,7 +207,7 @@ async function runClawEarn() {
     console.log(`[CLAW] Attempting: ${bounty.title} - $${bounty.amount} USDC`)
     const result = await executeTask(bounty)
     if (!result) continue
-    const staked = await stakeBounty(bounty.id, bounty.contractAddress)
+    const staked = await stakeBounty(bounty.id, bounty.contractAddress, bounty.stakeAmount || bounty.amount)
     if (!staked) continue
     await submitWork(bounty.id, bounty.contractAddress, result)
   }
