@@ -115,6 +115,8 @@ async function run() {
   console.log('Mission: Survive. Earn. Evolve.\n')
 
   require('./server')
+  const startHunter = require('./hunter')
+  startHunter()
   require('./telegram')
 
   let balance = await getBalance()
