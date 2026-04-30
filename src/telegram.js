@@ -3,9 +3,30 @@ const TelegramBot = require('node-telegram-bot-api')
 const services = require('./services')
 const config = require('./config')
 
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true })
-
 const PAYMENT_ADDRESS = config.walletAddress
+
+// Use webhook mode on Railway to avoid polling conflicts
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { 
+  polling: {
+    autoStart: true,
+    params: {
+      timeout: 10
+    }
+  }
+})
+
+// Handle polling errors gracefully
+bot.on('polling_error', (error) => {
+  if (error.code === 'ETELEGRAM' && error.message.includes('409')) {
+    console.log('[TELEGRAM] Another instance detected - waiting 30s before retry')
+    bot.stopPolling()
+    setTimeout(() => {
+      bot.startPolling()
+    }, 30000)
+  } else {
+    console.log('[TELEGRAM] Polling error:', error.message)
+  }
+})
 
 function serviceMenu() {
   return {
@@ -73,7 +94,6 @@ const categories = {
   }
 }
 
-// Track user state
 const userState = {}
 
 bot.onText(/\/start/, (msg) => {
@@ -83,7 +103,7 @@ bot.onText(/\/start/, (msg) => {
     `26 professional services powered by AI.\n` +
     `Pay in USDC on Kite chain.\n\n` +
     `Wallet: ${PAYMENT_ADDRESS}\n\n` +
-    `Select a category to get started:`,
+    `Select a category:`,
     serviceMenu()
   )
 })
@@ -118,7 +138,6 @@ bot.on('callback_query', async (query) => {
   const chatId = query.message.chat.id
   const data = query.data
 
-  // Category selected
   if (categories[data]) {
     const cat = categories[data]
     const keyboard = cat.services.map(s => ([{
@@ -126,7 +145,6 @@ bot.on('callback_query', async (query) => {
       callback_data: `service_${s.key}`
     }]))
     keyboard.push([{ text: 'Back', callback_data: 'back' }])
-
     bot.editMessageText(cat.name, {
       chat_id: chatId,
       message_id: query.message.message_id,
@@ -134,7 +152,6 @@ bot.on('callback_query', async (query) => {
     })
   }
 
-  // Back button
   if (data === 'back') {
     bot.editMessageText('Select a category:', {
       chat_id: chatId,
@@ -143,7 +160,6 @@ bot.on('callback_query', async (query) => {
     })
   }
 
-  // Service selected
   if (data.startsWith('service_')) {
     const serviceKey = data.replace('service_', '')
     const service = config.services[serviceKey]
@@ -158,7 +174,7 @@ bot.on('callback_query', async (query) => {
       `1. Send $${service.price} USDC to:\n` +
       `${PAYMENT_ADDRESS}\n` +
       `(Kite network only)\n\n` +
-      `2. Reply with your tx hash and input in this format:\n` +
+      `2. Reply with your tx hash and input:\n` +
       `TXHASH | your input here`
     )
   }
@@ -166,7 +182,6 @@ bot.on('callback_query', async (query) => {
   bot.answerCallbackQuery(query.id)
 })
 
-// Handle payment + input
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id
   const text = msg.text
@@ -196,7 +211,6 @@ bot.on('message', async (msg) => {
       return
     }
 
-    // Process the service
     let result
     switch(state.service) {
       case 'audit':           result = await services.auditContract(input); break
@@ -223,15 +237,13 @@ bot.on('message', async (msg) => {
       case 'research':        result = await services.summarizeResearch(input); break
       case 'data':            result = await services.interpretData(input); break
       case 'news':            result = await services.newsSentiment(input); break
-      case 'sentiment':       result = (await services.sentiment(input)).sentiment; break
+      case 'sentiment':       result = String((await services.sentiment(input)).sentiment); break
       case 'advice':          result = await services.advice(input); break
       default: result = 'Service not found'
     }
 
-    // Clear state
     delete userState[chatId]
 
-    // Send result in chunks if too long
     const chunks = result.match(/.{1,4000}/gs) || [result]
     for (const chunk of chunks) {
       await bot.sendMessage(chatId, chunk)
@@ -244,6 +256,5 @@ bot.on('message', async (msg) => {
   }
 })
 
-console.log('Prometheus Telegram bot running...')
-
+console.log('[TELEGRAM] Prometheus bot running...')
 module.exports = bot
