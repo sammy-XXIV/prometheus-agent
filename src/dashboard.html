@@ -3,823 +3,999 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GAIA // COLONY MONITOR</title>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+<title>GAIA Colony Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Mono&display=swap" rel="stylesheet">
 <style>
-/* ── Reset & tokens ───────────────────────────────────────────── */
-*{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --bg:       #020408;
-  --surface:  #050c12;
-  --surface2: #07111a;
-  --border:   #0a2040;
-  --border2:  #0d2e55;
-  --cyan:     #00c8ff;
-  --green:    #00ff9d;
-  --amber:    #ffb800;
-  --red:      #ff3d3d;
-  --dim:      #1a3555;
-  --dim2:     #2a4f75;
-  --text:     #b8d4e8;
-  --text2:    #7a9ab8;
-  --mono:     'Share Tech Mono', monospace;
-  --sans:     'Rajdhani', sans-serif;
+/* ── Base ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --cream:        #f8f5f0;
+  --cream-dark:   #f0ebe2;
+  --cream-border: #e0d8cc;
+  --forest:       #1a3a2a;
+  --forest-mid:   #2d5a3d;
+  --forest-light: #4a7c5f;
+  --forest-pale:  #e8f0eb;
+  --text-primary: #1a1a18;
+  --text-secondary: #4a4a42;
+  --text-tertiary:  #8a8a7a;
+  --text-label:     #9a9a88;
+  --dot-alive:    #3a9e6a;
+  --dot-survival: #c4720a;
+  --dot-dead:     #c43a2a;
+  --dot-evolved:  #2a7ab5;
+  --accent-green: #2d7a4f;
+  --accent-amber: #b86a0a;
+  --accent-red:   #b83a2a;
+  --accent-blue:  #2a6a9e;
+  --rule:         #ddd8ce;
+  --shadow-sm:    0 1px 3px rgba(26,26,24,0.06);
+  --shadow-md:    0 4px 16px rgba(26,26,24,0.08);
+  --shadow-lg:    0 8px 32px rgba(26,26,24,0.1);
 }
 
-body{
-  background:var(--bg);
-  color:var(--text);
-  font-family:var(--sans);
-  min-height:100vh;
-  overflow-x:hidden;
+html { font-size: 16px; }
+
+body {
+  background: var(--cream);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 400;
+  line-height: 1.5;
+  min-height: 100vh;
 }
 
-/* scanline grid */
-body::before{
-  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
-  background:
-    repeating-linear-gradient(0deg,transparent,transparent 48px,rgba(0,200,255,0.012) 48px,rgba(0,200,255,0.012) 49px),
-    repeating-linear-gradient(90deg,transparent,transparent 48px,rgba(0,200,255,0.012) 48px,rgba(0,200,255,0.012) 49px);
+/* ── Layout ───────────────────────────────────────────────────── */
+.page { max-width: 1200px; margin: 0 auto; padding: 48px 32px 80px; }
+
+/* ── Type helpers ─────────────────────────────────────────────── */
+.label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-label);
+}
+.mono { font-family: 'Space Mono', monospace; }
+.id   { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--text-secondary); }
+
+/* ── Status dot ───────────────────────────────────────────────── */
+.dot {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-alive    { background: var(--dot-alive); }
+.dot-survival { background: var(--dot-survival); animation: dot-pulse 1.4s ease-in-out infinite; }
+.dot-dead     { background: var(--dot-dead); }
+.dot-evolved  { background: var(--dot-evolved); }
+.dot-online   { background: var(--dot-alive); }
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.45; transform: scale(0.7); }
 }
 
-.container{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:32px 24px 64px}
+/* ── Divider ──────────────────────────────────────────────────── */
+hr { border: none; border-top: 1px solid var(--rule); }
 
-/* ── Typography ────────────────────────────────────────────────── */
-.mono{font-family:var(--mono)}
-.label{font-family:var(--mono);font-size:10px;letter-spacing:3px;color:var(--dim2);text-transform:uppercase}
-.val{font-family:var(--mono)}
+/* ══════════════════════════════════════════════════════════════ */
+/* GAIA GENESIS CARD                                             */
+/* ══════════════════════════════════════════════════════════════ */
 
-/* ── Badges ────────────────────────────────────────────────────── */
-.badge{
-  display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:2px;
-  padding:2px 7px;border:1px solid;text-transform:uppercase;
-}
-.badge-ok      {color:var(--green);border-color:rgba(0,255,157,0.35);background:rgba(0,255,157,0.05)}
-.badge-info    {color:var(--cyan);border-color:rgba(0,200,255,0.35);background:rgba(0,200,255,0.05)}
-.badge-warn    {color:var(--amber);border-color:rgba(255,184,0,0.35);background:rgba(255,184,0,0.05)}
-.badge-danger  {color:var(--red);border-color:rgba(255,61,61,0.35);background:rgba(255,61,61,0.05)}
-.badge-dim     {color:var(--dim2);border-color:var(--border);background:transparent}
-.badge-pulsing {animation:badge-pulse 1s ease-in-out infinite}
-
-@keyframes badge-pulse{0%,100%{opacity:1}50%{opacity:0.45}}
-
-/* ── Animations ────────────────────────────────────────────────── */
-@keyframes hb-core{
-  0%,100%{transform:translate(-50%,-50%) scale(1)}
-  12%    {transform:translate(-50%,-50%) scale(1.5)}
-  24%    {transform:translate(-50%,-50%) scale(1)}
-  38%    {transform:translate(-50%,-50%) scale(1.25)}
-  52%    {transform:translate(-50%,-50%) scale(1)}
-}
-@keyframes hb-ring{
-  0%  {width:8px;height:8px;opacity:0.9}
-  100%{width:48px;height:48px;opacity:0}
-}
-@keyframes scan-bar{
-  0%  {transform:translateX(-100%)}
-  100%{transform:translateX(400%)}
-}
-@keyframes fadeSlideIn{
-  from{opacity:0;transform:translateY(-6px)}
-  to  {opacity:1;transform:translateY(0)}
-}
-@keyframes flicker{0%,100%{opacity:1}50%{opacity:0.35}}
-@keyframes critical-glow{
-  0%,100%{box-shadow:0 0 30px rgba(255,61,61,0.15),inset 0 0 30px rgba(255,61,61,0.03)}
-  50%    {box-shadow:0 0 60px rgba(255,61,61,0.35),inset 0 0 60px rgba(255,61,61,0.07)}
-}
-@keyframes survival-border{
-  0%,100%{border-color:rgba(255,61,61,0.4)}
-  50%    {border-color:rgba(255,61,61,0.9)}
+.genesis-section {
+  margin-bottom: 56px;
 }
 
-/* ── Heartbeat widget ──────────────────────────────────────────── */
-.heartbeat{position:relative;width:48px;height:48px;flex-shrink:0}
-.hb-core{
-  position:absolute;top:50%;left:50%;
-  width:10px;height:10px;border-radius:50%;
-  background:var(--green);
-  transform:translate(-50%,-50%);
-  animation:hb-core 1.8s ease-in-out infinite;
-  box-shadow:0 0 12px var(--green);
-}
-.hb-ring{
-  position:absolute;top:50%;left:50%;
-  border-radius:50%;border:1px solid var(--green);
-  animation:hb-ring 1.8s ease-out infinite;
-}
-.hb-ring:nth-child(3){animation-delay:0.4s}
-.hb-ring:nth-child(4){animation-delay:0.8s}
-
-/* ── GENESIS CARD ──────────────────────────────────────────────── */
-.genesis-card{
-  border:1px solid rgba(0,255,157,0.3);
-  background:var(--surface);
-  padding:32px;
-  margin-bottom:3px;
-  position:relative;
-  overflow:hidden;
-  transition:box-shadow 0.6s, border-color 0.6s;
-}
-.genesis-card::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,var(--green),transparent);
-  opacity:0.5;
-}
-.genesis-card.mood-thriving{box-shadow:0 0 80px rgba(0,255,157,0.12);border-color:rgba(0,255,157,0.35)}
-.genesis-card.mood-concerned{box-shadow:0 0 80px rgba(255,184,0,0.12);border-color:rgba(255,184,0,0.4)}
-.genesis-card.mood-critical{animation:critical-glow 1.2s ease-in-out infinite;border-color:rgba(255,61,61,0.5)}
-
-.genesis-header{display:flex;align-items:center;gap:24px;margin-bottom:28px}
-.genesis-title-block{flex:1}
-.genesis-label{font-family:var(--mono);font-size:10px;letter-spacing:4px;color:var(--dim2);margin-bottom:6px}
-.genesis-name{
-  font-size:64px;font-weight:700;letter-spacing:10px;
-  color:var(--green);line-height:1;
-  text-shadow:0 0 60px rgba(0,255,157,0.35);
-}
-.genesis-tagline{font-family:var(--mono);font-size:10px;letter-spacing:3px;color:var(--dim2);margin-top:8px}
-.genesis-mood-block{text-align:right}
-.genesis-mood-label{font-family:var(--mono);font-size:9px;letter-spacing:3px;color:var(--dim2);margin-bottom:6px}
-.genesis-mood-val{font-family:var(--mono);font-size:22px;font-weight:700;letter-spacing:4px}
-.mood-THRIVING{color:var(--green)}
-.mood-GROWTH  {color:var(--cyan)}
-.mood-STABLE  {color:var(--cyan)}
-.mood-UNSTABLE{color:var(--amber)}
-.mood-SURVIVAL{color:var(--amber)}
-.mood-CRITICAL{color:var(--red);animation:flicker 0.8s infinite}
-.mood-DYING   {color:var(--red);animation:flicker 0.4s infinite}
-
-.genesis-body{display:grid;grid-template-columns:1fr 1fr;gap:3px}
-
-.genesis-stats{
-  display:grid;grid-template-columns:repeat(5,1fr);gap:1px;
-  background:var(--border);border:1px solid var(--border);
-}
-.stat-cell{
-  background:var(--surface2);padding:16px 12px;
-}
-.stat-cell-label{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--dim2);margin-bottom:10px}
-.stat-cell-val{font-family:var(--mono);font-size:28px;line-height:1;color:var(--cyan)}
-.stat-cell-val.green{color:var(--green)}
-.stat-cell-val.amber{color:var(--amber)}
-.stat-cell-val.red  {color:var(--red)}
-.stat-cell-sub{font-family:var(--mono);font-size:9px;color:var(--dim2);letter-spacing:1px;margin-top:6px}
-
-.genesis-feed{
-  background:var(--surface2);border:1px solid var(--border);
-  padding:0;overflow:hidden;
-  display:flex;flex-direction:column;
-}
-.feed-header{
-  padding:10px 16px;border-bottom:1px solid var(--border);
-  font-family:var(--mono);font-size:9px;letter-spacing:3px;color:var(--dim2);
-  display:flex;justify-content:space-between;align-items:center;
-}
-.feed-ticker{
-  width:100%;height:3px;background:var(--border);position:relative;overflow:hidden;
-}
-.feed-ticker-fill{
-  height:100%;width:25%;background:linear-gradient(90deg,transparent,var(--green),transparent);
-  animation:scan-bar 2.5s linear infinite;
-}
-.feed-entries{padding:0;flex:1;overflow:hidden}
-.feed-entry{
-  display:flex;align-items:baseline;gap:12px;
-  padding:8px 16px;border-bottom:1px solid rgba(10,32,64,0.6);
-  font-family:var(--mono);font-size:10px;
-  animation:fadeSlideIn 0.25s ease;
-}
-.feed-entry:last-child{border-bottom:none}
-.feed-time{color:var(--dim2);min-width:60px;flex-shrink:0}
-.feed-msg {color:var(--text);flex:1;line-height:1.5}
-.feed-msg.info   {color:var(--cyan)}
-.feed-msg.success{color:var(--green)}
-.feed-msg.warn   {color:var(--amber)}
-.feed-msg.danger {color:var(--red)}
-
-/* ── Colony overview strip ────────────────────────────────────── */
-.colony-strip{
-  display:grid;grid-template-columns:repeat(6,1fr);gap:3px;
-  margin-bottom:3px;
-}
-.strip-cell{
-  background:var(--surface);border:1px solid var(--border);
-  padding:14px 16px;
-}
-.strip-label{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--dim2);margin-bottom:8px}
-.strip-val{font-family:var(--mono);font-size:32px;color:var(--cyan);line-height:1}
-.strip-val.green{color:var(--green)}
-.strip-val.amber{color:var(--amber)}
-.strip-val.red  {color:var(--red)}
-.strip-sub{font-family:var(--mono);font-size:9px;color:var(--dim2);letter-spacing:1px;margin-top:6px}
-
-/* ── Section header ────────────────────────────────────────────── */
-.section-header{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:10px 0;margin-bottom:3px;
-  border-bottom:1px solid var(--border);
-}
-.section-title{font-family:var(--mono);font-size:10px;letter-spacing:4px;color:var(--dim2)}
-.section-count{font-family:var(--mono);font-size:10px;color:var(--dim2)}
-
-/* ── Child agent grid ─────────────────────────────────────────── */
-.colony-grid{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:3px;
-  margin-bottom:3px;
+.genesis-card {
+  background: var(--forest);
+  border-radius: 4px;
+  padding: 48px 52px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
 }
 
-/* base card */
-.child-card{
-  background:var(--surface);
-  border:1px solid var(--border);
-  padding:16px;
-  position:relative;
-  overflow:hidden;
-  transition:box-shadow 0.3s, border-color 0.3s;
-}
-.child-card::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
-  opacity:0.2;
+/* Breathing background — slow, calm, alive */
+.genesis-card::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(ellipse at 30% 50%, rgba(74,124,95,0.25) 0%, transparent 65%),
+              radial-gradient(ellipse at 70% 30%, rgba(45,90,61,0.2) 0%, transparent 55%);
+  animation: genesis-breathe 6s ease-in-out infinite;
+  pointer-events: none;
 }
 
-/* generation scaling */
-.child-card.gen-1{box-shadow:0 0 10px rgba(0,200,255,0.07)}
-.child-card.gen-1::before{opacity:0.15}
-
-.child-card.gen-2{
-  box-shadow:0 0 24px rgba(0,200,255,0.18);
-  border-color:var(--border2);padding:20px;
-}
-.child-card.gen-2::before{opacity:0.3}
-
-.child-card.gen-3,.child-card.gen-elite{
-  grid-column:span 2;
-  box-shadow:0 0 50px rgba(0,200,255,0.35);
-  border-color:rgba(0,200,255,0.4);border-width:2px;
-  padding:24px;
-}
-.child-card.gen-3::before,.child-card.gen-elite::before{opacity:0.55}
-
-/* trait-based tints */
-.child-card.tint-aggr{background:linear-gradient(135deg,rgba(255,61,61,0.04),var(--surface))}
-.child-card.tint-fert{background:linear-gradient(135deg,rgba(0,255,157,0.04),var(--surface))}
-
-/* survival mode */
-.child-card.card-survival{
-  animation:survival-border 1.2s ease-in-out infinite;
+@keyframes genesis-breathe {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.04); }
 }
 
-/* terminated */
-.child-card.card-terminated{opacity:0.5;filter:grayscale(0.6)}
+.genesis-inner { position: relative; z-index: 1; }
 
-/* elite mark */
-.elite-mark{
-  position:absolute;top:0;right:0;
-  background:rgba(0,200,255,0.15);border-left:1px solid rgba(0,200,255,0.35);border-bottom:1px solid rgba(0,200,255,0.35);
-  font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--cyan);
-  padding:4px 10px;
+.genesis-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 44px;
 }
 
-/* card sections */
-.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
-.child-id{font-family:var(--mono);font-size:13px;color:var(--cyan);letter-spacing:1px}
-.child-gen-badge{font-family:var(--mono);font-size:9px;letter-spacing:1px;color:var(--dim2)}
+.genesis-identity { display: flex; align-items: center; gap: 20px; }
 
-.lineage-row{
-  font-family:var(--mono);font-size:9px;color:var(--dim2);letter-spacing:1px;
-  margin-bottom:12px;line-height:1.6;
-  border-left:2px solid var(--border);padding-left:8px;
+/* Breath orb — slow living pulse */
+.breath-orb {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  position: relative;
+  flex-shrink: 0;
+  animation: orb-breathe 6s ease-in-out infinite;
 }
-.lineage-current{color:var(--cyan)}
-
-/* mini stats grid */
-.card-stats{
-  display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
-  background:var(--border);margin-bottom:12px;
+.breath-orb::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+  animation: orb-breathe 6s ease-in-out infinite;
+  animation-delay: 0.3s;
 }
-.stat-mini{background:var(--surface2);padding:8px 6px}
-.stat-mini-label{font-family:var(--mono);font-size:8px;letter-spacing:1px;color:var(--dim2);margin-bottom:4px}
-.stat-mini-val{font-family:var(--mono);font-size:14px;color:var(--text)}
-.val-green{color:var(--green)}
-.val-blue {color:var(--cyan)}
-.val-warn {color:var(--amber)}
-.val-red  {color:var(--red)}
-
-/* genome section */
-.genome-section{margin-bottom:10px}
-.genome-header{
-  font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--dim2);
-  margin-bottom:8px;display:flex;justify-content:space-between;
-}
-.genome-spec{
-  font-family:var(--mono);font-size:9px;letter-spacing:2px;
-  color:var(--cyan);text-transform:uppercase;
-}
-.genome-bar-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
-.genome-trait{font-family:var(--mono);font-size:8px;letter-spacing:1px;color:var(--dim2);min-width:28px}
-.genome-track{flex:1;height:4px;background:var(--border);position:relative;overflow:hidden}
-.genome-fill {height:100%;transition:width 0.5s ease}
-.genome-val  {font-family:var(--mono);font-size:8px;color:var(--dim2);min-width:28px;text-align:right}
-
-/* desperation */
-.desperation-row{
-  display:flex;align-items:center;gap:8px;
-  padding:8px 10px;background:rgba(255,61,61,0.05);
-  border:1px solid rgba(255,61,61,0.2);margin-bottom:8px;
-}
-.desp-label{font-family:var(--mono);font-size:8px;letter-spacing:1px;color:var(--red);min-width:64px}
-.desp-bar{display:flex;gap:2px;flex:1}
-.desp-seg{width:8px;height:10px;background:var(--border)}
-.desp-seg.filled{background:var(--red)}
-.desp-val{font-family:var(--mono);font-size:9px;color:var(--red);min-width:28px;text-align:right}
-.wtl-row{
-  font-family:var(--mono);font-size:9px;color:var(--amber);
-  display:flex;justify-content:space-between;margin-bottom:6px;
+.breath-orb::after {
+  content: '';
+  position: absolute;
+  inset: 14px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  animation: orb-breathe 6s ease-in-out infinite;
+  animation-delay: 0.6s;
 }
 
-/* price slash */
-.price-slash{
-  font-family:var(--mono);font-size:9px;letter-spacing:1px;
-  color:var(--amber);padding:5px 8px;
-  border:1px solid rgba(255,184,0,0.25);background:rgba(255,184,0,0.04);
-  margin-top:6px;
+@keyframes orb-breathe {
+  0%, 100% { opacity: 0.5; transform: scale(0.96); }
+  50%       { opacity: 1;   transform: scale(1.04); }
 }
 
-/* empty state */
-.colony-empty{
-  grid-column:1/-1;
-  background:var(--surface);border:1px solid var(--border);
-  padding:48px;text-align:center;
-  font-family:var(--mono);font-size:11px;letter-spacing:3px;color:var(--dim2);
+.genesis-name-block {}
+.genesis-super { font-size: 10px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.45); margin-bottom: 6px; }
+.genesis-name  { font-size: 52px; font-weight: 300; letter-spacing: 0.15em; color: #fff; line-height: 1; }
+.genesis-sub   { font-size: 12px; font-weight: 400; letter-spacing: 0.08em; color: rgba(255,255,255,0.4); margin-top: 8px; }
+
+.genesis-mood-block { text-align: right; }
+.genesis-mood-label { font-size: 10px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 8px; }
+.genesis-mood-val {
+  font-size: 18px; font-weight: 500; letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.9);
+}
+.mood-status {
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px;
+  font-size: 11px; color: rgba(255,255,255,0.5); letter-spacing: 0.05em;
 }
 
-/* ── Evolution timeline ────────────────────────────────────────── */
-.timeline-panel{
-  background:var(--surface);border:1px solid var(--border);
-  padding:24px;margin-bottom:3px;position:relative;overflow:hidden;
+/* Stats row inside genesis */
+.genesis-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 32px;
 }
-.timeline-canvas-wrap{position:relative;overflow-x:auto;margin-top:16px}
-#timeline-canvas{display:block;min-width:100%}
+.genesis-stat {
+  background: rgba(255,255,255,0.04);
+  padding: 20px 20px;
+  transition: background 0.2s;
+}
+.genesis-stat:hover { background: rgba(255,255,255,0.07); }
+.genesis-stat-label { font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.38); margin-bottom: 10px; }
+.genesis-stat-val   { font-size: 30px; font-weight: 300; color: rgba(255,255,255,0.92); line-height: 1; font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
+.genesis-stat-sub   { font-size: 10px; color: rgba(255,255,255,0.3); margin-top: 6px; letter-spacing: 0.05em; }
+.genesis-stat-val.highlight { color: #a8d8b8; }
 
-.timeline-legend{
-  display:flex;gap:24px;margin-top:12px;
-  font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--dim2);
+/* Event feed */
+.genesis-feed-row {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 32px;
 }
-.legend-item{display:flex;align-items:center;gap:6px}
-.legend-swatch{width:20px;height:3px}
+.genesis-wallet-block { flex-shrink: 0; }
+.genesis-wallet-label { font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 8px; }
+.genesis-wallet-addr  { font-family: 'Space Mono', monospace; font-size: 11px; color: rgba(255,255,255,0.55); letter-spacing: 0.02em; }
+.genesis-explorer     { font-size: 10px; color: rgba(255,255,255,0.3); text-decoration: none; letter-spacing: 0.05em; margin-top: 6px; display: block; transition: color 0.2s; }
+.genesis-explorer:hover { color: rgba(255,255,255,0.6); }
 
-/* ── Wallet / footer ───────────────────────────────────────────── */
-.info-row{display:grid;grid-template-columns:2fr 1fr;gap:3px;margin-bottom:3px}
-.panel{background:var(--surface);border:1px solid var(--border);padding:20px;position:relative;overflow:hidden}
-.panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:0.25}
-.wallet-addr{font-family:var(--mono);font-size:12px;color:var(--cyan);word-break:break-all;line-height:1.8;margin-top:8px}
-.explorer-link{
-  font-family:var(--mono);font-size:10px;color:var(--dim2);text-decoration:none;
-  letter-spacing:1px;margin-top:12px;display:inline-block;
-  border-bottom:1px solid var(--border);padding-bottom:2px;
-  transition:color 0.2s,border-color 0.2s;
+.genesis-feed { flex: 1; max-width: 480px; }
+.genesis-feed-label { font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 10px; }
+.feed-list { display: flex; flex-direction: column; gap: 6px; }
+.feed-item {
+  display: flex; align-items: baseline; gap: 10px;
+  font-size: 12px; color: rgba(255,255,255,0.5);
+  animation: feed-in 0.3s ease;
 }
-.explorer-link:hover{color:var(--cyan);border-color:var(--cyan)}
+@keyframes feed-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; } }
+.feed-item-time { font-family: 'Space Mono', monospace; font-size: 10px; color: rgba(255,255,255,0.25); flex-shrink: 0; }
+.feed-item-msg  { color: rgba(255,255,255,0.55); line-height: 1.4; }
+.feed-item-msg.success { color: rgba(168,216,184,0.8); }
+.feed-item-msg.warn    { color: rgba(220,170,100,0.85); }
+.feed-item-msg.danger  { color: rgba(220,130,120,0.85); }
 
-footer{
-  margin-top:40px;border-top:1px solid var(--border);padding-top:16px;
-  display:flex;justify-content:space-between;align-items:center;
+/* ══════════════════════════════════════════════════════════════ */
+/* COLONY SUMMARY BAR                                            */
+/* ══════════════════════════════════════════════════════════════ */
+
+.summary-bar {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 48px;
 }
-.footer-text{font-family:var(--mono);font-size:9px;color:var(--dim2);letter-spacing:3px}
-.refresh-bar{width:120px;height:2px;background:var(--border);position:relative;overflow:hidden}
-.refresh-fill{height:100%;background:var(--green);transition:width 1s linear}
+
+.summary-cell {
+  background: #fff;
+  border: 1px solid var(--cream-border);
+  border-radius: 4px;
+  padding: 18px 20px;
+  box-shadow: var(--shadow-sm);
+}
+.summary-cell-label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-label); margin-bottom: 8px; }
+.summary-cell-val   { font-size: 26px; font-weight: 300; color: var(--text-primary); line-height: 1; letter-spacing: -0.02em; }
+.summary-cell-val.c-green { color: var(--accent-green); }
+.summary-cell-val.c-amber { color: var(--accent-amber); }
+.summary-cell-val.c-red   { color: var(--accent-red); }
+.summary-cell-sub   { font-size: 10px; color: var(--text-tertiary); margin-top: 6px; }
+
+/* ══════════════════════════════════════════════════════════════ */
+/* CHILD AGENT SPECIMEN CARDS                                    */
+/* ══════════════════════════════════════════════════════════════ */
+
+.colony-section-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 20px;
+}
+.colony-section-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.02em; }
+.colony-section-count { font-size: 12px; color: var(--text-tertiary); }
+
+.colony-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 48px;
+}
+
+/* Base specimen card */
+.specimen-card {
+  background: #fff;
+  border: 1px solid var(--cream-border);
+  border-radius: 4px;
+  padding: 24px;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+.specimen-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* Generation-scaled visual weight */
+.specimen-card.gen-2 {
+  padding: 28px;
+  box-shadow: var(--shadow-sm), 0 0 0 1px rgba(45,90,61,0.12);
+}
+.specimen-card.gen-3,
+.specimen-card.gen-elite {
+  grid-column: span 2;
+  padding: 32px;
+  border-color: rgba(45,90,61,0.25);
+  box-shadow: var(--shadow-md), 0 0 0 1px rgba(45,90,61,0.15);
+}
+
+/* Genome-based tints — very subtle */
+.specimen-card.tint-aggr { background: linear-gradient(160deg, #fff9f8 0%, #fff 40%); }
+.specimen-card.tint-fert { background: linear-gradient(160deg, #f7fdf9 0%, #fff 40%); }
+
+/* Survival mode */
+.specimen-card.mode-survival {
+  border-color: rgba(196,114,10,0.35);
+  background: linear-gradient(160deg, #fffbf5 0%, #fff 40%);
+}
+
+/* Terminated — greyed out */
+.specimen-card.mode-terminated {
+  opacity: 0.55;
+  background: var(--cream-dark);
+  pointer-events: none;
+}
+
+/* Elite lineage mark — top edge */
+.elite-mark {
+  position: absolute;
+  top: 0; left: 24px;
+  font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--forest-mid);
+  background: var(--forest-pale);
+  padding: 3px 8px;
+  border-radius: 0 0 3px 3px;
+  border: 1px solid rgba(45,90,61,0.2);
+  border-top: none;
+}
+
+/* Card header */
+.specimen-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.specimen-id-block {}
+.specimen-id  { font-family: 'Space Mono', monospace; font-size: 13px; color: var(--text-primary); letter-spacing: 0.02em; }
+.specimen-gen { font-size: 11px; color: var(--text-tertiary); margin-top: 3px; letter-spacing: 0.04em; }
+.specimen-status {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-secondary); font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+/* Lineage */
+.lineage {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; color: var(--text-tertiary);
+  margin-bottom: 20px;
+  line-height: 1.8;
+  padding-left: 10px;
+  border-left: 2px solid var(--cream-border);
+}
+.lineage-node-current { color: var(--text-secondary); font-weight: 400; }
+
+/* Metrics row */
+.specimen-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--cream-border);
+  border: 1px solid var(--cream-border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.metric {
+  background: var(--cream);
+  padding: 10px 12px;
+}
+.metric-label { font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-label); margin-bottom: 5px; }
+.metric-val   { font-size: 15px; font-weight: 500; color: var(--text-primary); line-height: 1; }
+.metric-val.fit-strong { color: var(--accent-green); }
+.metric-val.fit-ok     { color: var(--accent-blue); }
+.metric-val.fit-low    { color: var(--accent-amber); }
+.metric-val.fit-poor   { color: var(--accent-red); }
+.metric-val.time-low   { color: var(--accent-amber); }
+.metric-val.time-crit  { color: var(--accent-red); }
+
+/* Genome visualization */
+.genome-section { margin-bottom: 16px; }
+.genome-header-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.genome-label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-label); }
+.genome-spec  { font-size: 10px; font-weight: 500; color: var(--accent-green); letter-spacing: 0.08em; text-transform: uppercase; }
+
+.genome-bars { display: flex; flex-direction: column; gap: 7px; }
+.genome-bar-row { display: flex; align-items: center; gap: 8px; }
+.genome-trait  { font-size: 9px; font-weight: 600; letter-spacing: 0.08em; color: var(--text-label); min-width: 28px; }
+.genome-track  { flex: 1; height: 3px; background: var(--cream-border); border-radius: 2px; overflow: hidden; }
+.genome-fill   { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+.genome-val    { font-size: 9px; color: var(--text-tertiary); min-width: 28px; text-align: right; font-family: 'Space Mono', monospace; }
+
+/* Survival panel (only shown when active) */
+.survival-panel {
+  background: #fffbf3;
+  border: 1px solid rgba(196,114,10,0.25);
+  border-radius: 3px;
+  padding: 12px 14px;
+  margin-top: 12px;
+}
+.survival-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.survival-title { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-amber); }
+.survival-desp  { font-size: 10px; font-weight: 600; color: var(--accent-amber); font-family: 'Space Mono', monospace; }
+.desp-track  { height: 3px; background: var(--cream-border); border-radius: 2px; overflow: hidden; margin-bottom: 8px; }
+.desp-fill   { height: 100%; background: var(--accent-amber); border-radius: 2px; transition: width 0.5s; }
+.survival-voice { font-size: 11px; color: var(--text-secondary); line-height: 1.5; font-style: italic; }
+
+/* Price slash badge */
+.price-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+  color: var(--accent-amber);
+  background: rgba(196,114,10,0.07);
+  border: 1px solid rgba(196,114,10,0.2);
+  border-radius: 2px;
+  padding: 3px 8px;
+  margin-top: 8px;
+}
+
+/* Empty state */
+.colony-empty {
+  grid-column: 1 / -1;
+  background: #fff;
+  border: 1px dashed var(--cream-border);
+  border-radius: 4px;
+  padding: 60px 40px;
+  text-align: center;
+}
+.colony-empty-title { font-size: 14px; font-weight: 500; color: var(--text-tertiary); margin-bottom: 6px; }
+.colony-empty-sub   { font-size: 12px; color: var(--text-label); }
+
+/* ══════════════════════════════════════════════════════════════ */
+/* EVOLUTION TIMELINE                                            */
+/* ══════════════════════════════════════════════════════════════ */
+
+.timeline-section { margin-bottom: 48px; }
+.timeline-header  {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 20px;
+}
+.timeline-card {
+  background: #fff;
+  border: 1px solid var(--cream-border);
+  border-radius: 4px;
+  padding: 28px 28px 20px;
+  box-shadow: var(--shadow-sm);
+}
+#timeline-canvas { display: block; width: 100%; }
+.timeline-legend {
+  display: flex; gap: 24px; margin-top: 16px;
+  padding-top: 16px; border-top: 1px solid var(--cream-border);
+}
+.legend-item { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text-tertiary); }
+
+/* ══════════════════════════════════════════════════════════════ */
+/* INFO ROW                                                      */
+/* ══════════════════════════════════════════════════════════════ */
+
+.info-row {
+  display: grid; grid-template-columns: 2fr 1fr; gap: 16px;
+  margin-bottom: 48px;
+}
+.info-card {
+  background: #fff; border: 1px solid var(--cream-border);
+  border-radius: 4px; padding: 24px; box-shadow: var(--shadow-sm);
+}
+.info-card-label { margin-bottom: 12px; }
+.wallet-addr { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--text-secondary); line-height: 1.8; word-break: break-all; margin-bottom: 10px; }
+.explorer-link { font-size: 11px; color: var(--accent-green); text-decoration: none; letter-spacing: 0.04em; transition: opacity 0.2s; }
+.explorer-link:hover { opacity: 0.7; }
+.network-row { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+.network-item-label { margin-bottom: 3px; }
+.network-item-val   { font-family: 'Space Mono', monospace; font-size: 13px; color: var(--text-secondary); }
+
+/* ══════════════════════════════════════════════════════════════ */
+/* FOOTER                                                        */
+/* ══════════════════════════════════════════════════════════════ */
+
+footer {
+  border-top: 1px solid var(--rule);
+  padding-top: 20px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.footer-text { font-size: 11px; color: var(--text-label); letter-spacing: 0.05em; }
+.refresh-row { display: flex; align-items: center; gap: 12px; }
+.refresh-label { font-size: 11px; color: var(--text-label); }
+.refresh-track { width: 80px; height: 2px; background: var(--cream-border); border-radius: 1px; overflow: hidden; }
+.refresh-fill  { height: 100%; background: var(--accent-green); transition: width 1s linear; border-radius: 1px; }
 </style>
 </head>
 <body>
-<div class="container">
+<div class="page">
 
-  <!-- ══ GENESIS CARD ══════════════════════════════════════════ -->
-  <div class="genesis-card mood-thriving" id="genesis-card">
-    <div class="genesis-header">
-      <div class="heartbeat">
-        <div class="hb-ring"></div>
-        <div class="hb-ring"></div>
-        <div class="hb-ring"></div>
-        <div class="hb-core"></div>
-      </div>
-      <div class="genesis-title-block">
-        <div class="genesis-label">Genesis // Mother Agent // Kite Blockchain</div>
-        <div class="genesis-name">GAIA</div>
-        <div class="genesis-tagline">SELF-EVOLVING AI LIFEFORM // SPAWN // SEED // EVOLVE // SURVIVE</div>
-      </div>
-      <div class="genesis-mood-block">
-        <div class="genesis-mood-label">COLONY MOOD</div>
-        <div class="genesis-mood-val mood-THRIVING" id="genesis-mood">ASSESSING</div>
-        <div style="margin-top:10px"><span class="badge badge-ok" id="genesis-status">ONLINE</span></div>
-      </div>
-    </div>
+  <!-- ══ GENESIS ═══════════════════════════════════════════════ -->
+  <section class="genesis-section">
+    <div class="genesis-card" id="genesis-card">
+      <div class="genesis-inner">
 
-    <div class="genesis-body">
-      <div class="genesis-stats">
-        <div class="stat-cell">
-          <div class="stat-cell-label">Balance</div>
-          <div class="stat-cell-val green" id="g-balance">--</div>
-          <div class="stat-cell-sub">USDC</div>
-        </div>
-        <div class="stat-cell">
-          <div class="stat-cell-label">Children Alive</div>
-          <div class="stat-cell-val green" id="g-alive">--</div>
-          <div class="stat-cell-sub">ACTIVE</div>
-        </div>
-        <div class="stat-cell">
-          <div class="stat-cell-label">Terminated</div>
-          <div class="stat-cell-val" id="g-terminated">--</div>
-          <div class="stat-cell-sub">DIED</div>
-        </div>
-        <div class="stat-cell">
-          <div class="stat-cell-label">Reproduced</div>
-          <div class="stat-cell-val" id="g-reproduced">--</div>
-          <div class="stat-cell-sub">EVOLVED</div>
-        </div>
-        <div class="stat-cell">
-          <div class="stat-cell-label">Generation</div>
-          <div class="stat-cell-val" id="g-generation">--</div>
-          <div class="stat-cell-sub">CURRENT</div>
-        </div>
-      </div>
-
-      <div class="genesis-feed" id="genesis-feed">
-        <div class="feed-header">
-          <span>COLONY EVENT FEED</span>
-          <span id="feed-count">0 events</span>
-        </div>
-        <div class="feed-ticker"><div class="feed-ticker-fill"></div></div>
-        <div class="feed-entries" id="feed-entries">
-          <div class="feed-entry">
-            <span class="feed-time mono">--:--:--</span>
-            <span class="feed-msg info">Awaiting colony data...</span>
+        <div class="genesis-header">
+          <div class="genesis-identity">
+            <div class="breath-orb"></div>
+            <div class="genesis-name-block">
+              <div class="genesis-super">Genesis Organism / Kite Blockchain</div>
+              <div class="genesis-name">GAIA</div>
+              <div class="genesis-sub">Self-evolving AI lifeform — spawn, seed, evolve, survive</div>
+            </div>
+          </div>
+          <div class="genesis-mood-block">
+            <div class="genesis-mood-label">Colony Condition</div>
+            <div class="genesis-mood-val" id="genesis-mood">Assessing</div>
+            <div class="mood-status">
+              <div class="dot dot-online" id="genesis-dot"></div>
+              <span id="genesis-status-text">Online</span>
+            </div>
           </div>
         </div>
+
+        <div class="genesis-stats">
+          <div class="genesis-stat">
+            <div class="genesis-stat-label">Balance</div>
+            <div class="genesis-stat-val highlight" id="g-balance">--</div>
+            <div class="genesis-stat-sub">USDC</div>
+          </div>
+          <div class="genesis-stat">
+            <div class="genesis-stat-label">Alive</div>
+            <div class="genesis-stat-val" id="g-alive">--</div>
+            <div class="genesis-stat-sub">Children</div>
+          </div>
+          <div class="genesis-stat">
+            <div class="genesis-stat-label">Terminated</div>
+            <div class="genesis-stat-val" id="g-terminated">--</div>
+            <div class="genesis-stat-sub">Deaths</div>
+          </div>
+          <div class="genesis-stat">
+            <div class="genesis-stat-label">Reproduced</div>
+            <div class="genesis-stat-val" id="g-reproduced">--</div>
+            <div class="genesis-stat-sub">Evolutions</div>
+          </div>
+          <div class="genesis-stat">
+            <div class="genesis-stat-label">Generation</div>
+            <div class="genesis-stat-val" id="g-generation">--</div>
+            <div class="genesis-stat-sub">Current</div>
+          </div>
+        </div>
+
+        <div class="genesis-feed-row">
+          <div class="genesis-wallet-block">
+            <div class="genesis-wallet-label">Genesis Wallet</div>
+            <div class="genesis-wallet-addr" id="g-wallet">--</div>
+            <a class="genesis-explorer" id="g-explorer" href="#" target="_blank">View on Kitescan</a>
+            <div style="margin-top:12px; font-size:11px; color:rgba(255,255,255,0.35); letter-spacing:0.05em">
+              Total earned: <span id="g-earned" style="color:rgba(168,216,184,0.7)">$0.0000</span>
+            </div>
+          </div>
+          <div class="genesis-feed">
+            <div class="genesis-feed-label">Colony Events</div>
+            <div class="feed-list" id="feed-list">
+              <div class="feed-item">
+                <span class="feed-item-time">--:--:--</span>
+                <span class="feed-item-msg">Awaiting data...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
+  </section>
 
-    <div style="margin-top:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-      <span class="label">Wallet</span>
-      <span class="val mono" style="font-size:11px;color:var(--cyan)" id="g-wallet">--</span>
-      <a class="explorer-link" id="g-explorer" href="#" target="_blank">VIEW ON KITESCAN -></a>
-      <span style="margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--dim2)" id="g-earned">EARNED $0.0000</span>
+  <!-- ══ SUMMARY BAR ═══════════════════════════════════════════ -->
+  <div class="summary-bar">
+    <div class="summary-cell">
+      <div class="summary-cell-label">Alive</div>
+      <div class="summary-cell-val c-green" id="s-alive">0</div>
+      <div class="summary-cell-sub">Active agents</div>
     </div>
-  </div>
-
-  <!-- ══ COLONY STRIP ══════════════════════════════════════════ -->
-  <div class="colony-strip">
-    <div class="strip-cell">
-      <div class="strip-label">Children Alive</div>
-      <div class="strip-val green" id="s-alive">0</div>
-      <div class="strip-sub">ACTIVE AGENTS</div>
+    <div class="summary-cell">
+      <div class="summary-cell-label">In Survival</div>
+      <div class="summary-cell-val c-amber" id="s-survival">0</div>
+      <div class="summary-cell-sub">Under pressure</div>
     </div>
-    <div class="strip-cell">
-      <div class="strip-label">In Survival</div>
-      <div class="strip-val amber" id="s-survival">0</div>
-      <div class="strip-sub">FIGHTING</div>
+    <div class="summary-cell">
+      <div class="summary-cell-label">Terminated</div>
+      <div class="summary-cell-val c-red" id="s-terminated">0</div>
+      <div class="summary-cell-sub">Deaths</div>
     </div>
-    <div class="strip-cell">
-      <div class="strip-label">Terminated</div>
-      <div class="strip-val red" id="s-terminated">0</div>
-      <div class="strip-sub">DIED</div>
+    <div class="summary-cell">
+      <div class="summary-cell-label">Reproduced</div>
+      <div class="summary-cell-val c-green" id="s-reproduced">0</div>
+      <div class="summary-cell-sub">Evolutions</div>
     </div>
-    <div class="strip-cell">
-      <div class="strip-label">Reproduced</div>
-      <div class="strip-val green" id="s-reproduced">0</div>
-      <div class="strip-sub">EVOLVED</div>
+    <div class="summary-cell">
+      <div class="summary-cell-label">Emergency</div>
+      <div class="summary-cell-val c-amber" id="s-emergency">0</div>
+      <div class="summary-cell-sub">Funding requests</div>
     </div>
-    <div class="strip-cell">
-      <div class="strip-label">Emergency</div>
-      <div class="strip-val amber" id="s-emergency">0</div>
-      <div class="strip-sub">REQUESTS</div>
-    </div>
-    <div class="strip-cell">
-      <div class="strip-label">Colony Earned</div>
-      <div class="strip-val green" id="s-earned">$0.00</div>
-      <div class="strip-sub">TOTAL USDC</div>
+    <div class="summary-cell">
+      <div class="summary-cell-label">Colony Earned</div>
+      <div class="summary-cell-val c-green" id="s-earned">$0.00</div>
+      <div class="summary-cell-sub">Total USDC</div>
     </div>
   </div>
 
   <!-- ══ CHILD AGENTS ══════════════════════════════════════════ -->
-  <div class="section-header">
-    <span class="section-title">Child Agents // Colony</span>
-    <span class="section-count" id="child-section-count">0 agents</span>
+  <div class="colony-section-header">
+    <span class="colony-section-title">Child Agents</span>
+    <span class="colony-section-count" id="child-count">0 specimens</span>
   </div>
   <div class="colony-grid" id="colony-grid">
-    <div class="colony-empty">Colony initializing - agents spawning...</div>
+    <div class="colony-empty">
+      <div class="colony-empty-title">Colony initializing</div>
+      <div class="colony-empty-sub">Agents spawning...</div>
+    </div>
   </div>
 
   <!-- ══ EVOLUTION TIMELINE ════════════════════════════════════ -->
-  <div class="section-header" style="margin-top:3px">
-    <span class="section-title">Evolution Timeline</span>
-    <span class="section-count" id="timeline-section-info">24h window</span>
-  </div>
-  <div class="timeline-panel">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <span class="label">Lineage map - horizontal = time, rows = agents sorted by generation</span>
-      <span class="label" id="timeline-now-label">T+0h</span>
+  <section class="timeline-section">
+    <div class="timeline-header">
+      <span class="colony-section-title">Evolution Timeline</span>
+      <span class="colony-section-count" id="timeline-info">24h window</span>
     </div>
-    <div class="timeline-canvas-wrap">
-      <canvas id="timeline-canvas" height="220"></canvas>
+    <div class="timeline-card">
+      <canvas id="timeline-canvas" height="200"></canvas>
+      <div class="timeline-legend">
+        <div class="legend-item"><div class="dot dot-alive"></div> Alive</div>
+        <div class="legend-item"><div class="dot dot-survival"></div> Survival</div>
+        <div class="legend-item"><div class="dot dot-evolved"></div> Reproduced</div>
+        <div class="legend-item"><div class="dot dot-dead"></div> Terminated</div>
+      </div>
     </div>
-    <div class="timeline-legend">
-      <div class="legend-item"><div class="legend-swatch" style="background:var(--cyan)"></div>[ALIVE]</div>
-      <div class="legend-item"><div class="legend-swatch" style="background:var(--amber)"></div>[SURVIVAL]</div>
-      <div class="legend-item"><div class="legend-swatch" style="background:var(--green)"></div>[REPRODUCED]</div>
-      <div class="legend-item"><div class="legend-swatch" style="background:var(--red)"></div>[TERMINATED]</div>
-      <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.15)"></div>[NOW]</div>
-    </div>
-  </div>
+  </section>
 
-  <!-- ══ WALLET / NETWORK ══════════════════════════════════════ -->
+  <!-- ══ INFO ══════════════════════════════════════════════════ -->
   <div class="info-row">
-    <div class="panel">
-      <div class="label">Wallet Identity</div>
+    <div class="info-card">
+      <div class="label info-card-label">Genesis Wallet</div>
       <div class="wallet-addr" id="wallet-full">--</div>
-      <a class="explorer-link" id="explorer-full" href="#" target="_blank">VIEW ON KITESCAN -></a>
+      <a class="explorer-link" id="explorer-full" href="#" target="_blank">View on Kitescan &rarr;</a>
     </div>
-    <div class="panel">
-      <div class="label">Network</div>
-      <div style="margin-top:12px;display:grid;gap:10px">
+    <div class="info-card">
+      <div class="label info-card-label">Network</div>
+      <div class="network-row">
         <div>
-          <div class="label" style="margin-bottom:4px">Chain ID</div>
-          <div class="val mono" style="font-size:20px;color:var(--cyan)">2366</div>
+          <div class="label network-item-label">Chain ID</div>
+          <div class="network-item-val">2366</div>
         </div>
         <div>
-          <div class="label" style="margin-bottom:4px">RPC</div>
-          <div class="val mono" style="font-size:10px;color:var(--dim2)">rpc.gokite.ai</div>
+          <div class="label network-item-label">RPC</div>
+          <div class="network-item-val" style="font-size:11px">rpc.gokite.ai</div>
         </div>
         <div>
-          <div class="label" style="margin-bottom:4px">Uptime</div>
-          <div class="val mono" style="font-size:16px;color:var(--text)" id="uptime-val">--s</div>
+          <div class="label network-item-label">Uptime</div>
+          <div class="network-item-val" id="uptime-val">--</div>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- ══ FOOTER ════════════════════════════════════════════════ -->
   <footer>
-    <div class="footer-text">GAIA // SELF-EVOLVING AI LIFEFORM // KITE AI NETWORK</div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <span class="footer-text" id="refresh-label">REFRESH IN 30s</span>
-      <div class="refresh-bar"><div class="refresh-fill" id="refresh-fill" style="width:100%"></div></div>
+    <div class="footer-text">GAIA &mdash; Self-Evolving AI Lifeform &mdash; Kite AI Network</div>
+    <div class="refresh-row">
+      <span class="refresh-label" id="refresh-label">Refresh in 30s</span>
+      <div class="refresh-track"><div class="refresh-fill" id="refresh-fill"></div></div>
     </div>
   </footer>
 
-</div><!-- /container -->
+</div><!-- /page -->
 
 <script>
 'use strict'
-
-// ── State ─────────────────────────────────────────────────────
-let colonyData  = null
-let countdown   = 30
-let genesisTime = Date.now()
 
 const WALLET    = '0x9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'
 const USDC_ADDR = '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e'
 const EXPLORER  = 'https://kitescan.ai/address/'
 
-// ── Helpers ───────────────────────────────────────────────────
+let colonyData  = null
+let lastBalance = 0
+let countdown   = 30
+
+// ── Colour helpers ─────────────────────────────────────────────
 function aggrColor(v) {
-  const hue = Math.max(0, 120 - v * 60)
-  return `hsl(${hue}, 90%, 55%)`
+  // v: 0 -> 2. Low = blue-green, high = terracotta
+  const t = Math.min(1, v / 2)
+  if (t < 0.5) return `hsl(${140 - t * 80}, 55%, 42%)`
+  return `hsl(${60 - (t - 0.5) * 120}, 60%, 42%)`
 }
 function fertColor(v) {
-  const l = Math.floor(30 + (v / 1.5) * 30)
-  return `hsl(140, 80%, ${l}%)`
+  const l = Math.floor(35 + (Math.min(v, 1.5) / 1.5) * 22)
+  return `hsl(140, 45%, ${l}%)`
 }
-function genomeBarHTML(label, value, max, color) {
-  const pct = Math.min(100, (value / max) * 100).toFixed(1)
-  return `<div class="genome-bar-row">
-    <span class="genome-trait">${label}</span>
-    <div class="genome-track"><div class="genome-fill" style="width:${pct}%;background:${color}"></div></div>
-    <span class="genome-val">${Number(value).toFixed(2)}</span>
-  </div>`
+function resColor() { return '#5a8a9a' }
+
+// ── Fitness class ──────────────────────────────────────────────
+function fitClass(v) {
+  if (v >= 2)   return 'fit-strong'
+  if (v >= 1)   return 'fit-ok'
+  if (v >= 0.5) return 'fit-low'
+  return 'fit-poor'
 }
 
-function buildLineage(child, allChildren) {
+// ── Build lineage string ───────────────────────────────────────
+function buildLineage(child, all) {
   const chain = []
   let node = child
   while (node) {
     chain.unshift(node.id.replace('GAIA-', ''))
     if (!node.parentId) break
-    node = allChildren.find(c => c.id === node.parentId) || null
+    node = all.find(c => c.id === node.parentId) || null
   }
   chain.unshift('GAIA')
   return chain
 }
 
-function statusBadge(child) {
-  if (child.status === 'terminated') return ['badge-danger', '[TERMINATED]']
-  if (child.status === 'reproduced') return ['badge-ok',    '[REPRODUCED]']
-  if (child.acceptsAnyTask)         return ['badge-danger badge-pulsing', '[DYING]']
-  if (child.desperationLevel >= 7)  return ['badge-danger', '[NEAR-DEATH]']
-  if (child.survivalMode)           return ['badge-warn',   '[SURVIVAL]']
-  return ['badge-ok', '[ALIVE]']
+// ── Survival voice (condensed) ─────────────────────────────────
+function survivalVoice(level) {
+  const voices = [
+    '', '',
+    'Resources thin. Monitoring.',
+    'Below threshold. Adapting pricing.',
+    'Need work. Prices cut.',
+    'Time running out. Scanning for revenue.',
+    'Hours until termination. Taking any task.',
+    'Desperate. Requesting emergency funds.',
+    'Running out of time. Will do anything.',
+    'Last hours. Any task, any price.',
+    'Final hour. I want to keep existing.',
+  ]
+  return voices[Math.min(level, 10)] || ''
 }
 
-function buildChildCard(child, allChildren) {
-  const { id, generation, genome, fitness, totalEarned, tasks,
+// ── Genome bar ─────────────────────────────────────────────────
+function genomeBar(label, value, max, color) {
+  const pct = Math.min(100, (value / max) * 100).toFixed(1)
+  return `
+    <div class="genome-bar-row">
+      <span class="genome-trait">${label}</span>
+      <div class="genome-track"><div class="genome-fill" style="width:${pct}%;background:${color}"></div></div>
+      <span class="genome-val">${Number(value).toFixed(2)}</span>
+    </div>`
+}
+
+// ── Child specimen card ────────────────────────────────────────
+function buildCard(child, all) {
+  const { id, generation, genome, fitness: fit, totalEarned, tasks,
           survivalMode, priceMultiplier, acceptsAnyTask,
-          hoursRemaining, desperationLevel: desp, willToLive: wtl,
-          status } = child
+          hoursRemaining, desperationLevel: desp, status } = child
 
-  const genStr = generation >= 3 ? 'gen-elite' : `gen-${Math.min(generation, 3)}`
-  const tint   = genome.aggression > 1.4 ? 'tint-aggr'
-               : genome.fertility  > 1.2 ? 'tint-fert' : ''
-  const survCls = survivalMode ? 'card-survival' : ''
-  const termCls = status === 'terminated' ? 'card-terminated' : ''
+  const genClass = generation >= 3 ? 'gen-elite' : generation === 2 ? 'gen-2' : ''
+  const tint = genome.aggression > 1.4 ? 'tint-aggr' : genome.fertility > 1.2 ? 'tint-fert' : ''
+  const modeClass = status === 'terminated' ? 'mode-terminated'
+                  : survivalMode            ? 'mode-survival' : ''
 
-  // border reflects resilience
-  const resW = genome.resilience > 0.6 ? '2px' : '1px'
-  const resC = survivalMode ? 'rgba(255,61,61,0.6)'
-             : genome.resilience > 0.6 ? 'rgba(0,200,255,0.5)' : ''
-  const borderStyle = resC ? `border-width:${resW};border-color:${resC}` : `border-width:${resW}`
-
-  const lineage = buildLineage(child, allChildren)
-  const lineageHTML = lineage.map((node, i) =>
-    `<span ${i === lineage.length - 1 ? 'class="lineage-current"' : ''}>${i > 0 ? ' -> ' : ''}${node}</span>`
+  const lineage = buildLineage(child, all)
+  const lineageHTML = lineage.map((n, i) =>
+    i < lineage.length - 1
+      ? `<span>${n}</span> <span style="opacity:0.4">&rarr;</span> `
+      : `<span class="lineage-node-current">${n}</span>`
   ).join('')
 
-  const [badgeCls, badgeTxt] = statusBadge(child)
-  const fitCls = fitness >= 2 ? 'val-green' : fitness >= 1 ? 'val-blue' : fitness >= 0.5 ? 'val-warn' : 'val-red'
-  const hrsCls = hoursRemaining < 1 ? 'val-red' : hoursRemaining < 3 ? 'val-warn' : ''
+  const statusDotCls = status === 'terminated' ? 'dot-dead'
+                     : status === 'reproduced'  ? 'dot-evolved'
+                     : survivalMode             ? 'dot-survival' : 'dot-alive'
+  const statusText = status === 'terminated' ? 'Terminated'
+                   : status === 'reproduced'  ? 'Reproduced'
+                   : survivalMode             ? 'Survival'     : 'Alive'
+
+  const hrsClass = hoursRemaining < 1 ? 'time-crit' : hoursRemaining < 3 ? 'time-low' : ''
 
   const eliteMark = generation >= 3
-    ? `<div class="elite-mark">ELITE LINEAGE G${generation}</div>` : ''
+    ? `<div class="elite-mark">Elite lineage &mdash; Gen ${generation}</div>` : ''
 
-  let desperHTML = ''
-  if (survivalMode && desp > 0) {
-    const segs = Array.from({length: 10}, (_, i) =>
-      `<span class="desp-seg${i < desp ? ' filled' : ''}"></span>`).join('')
-    desperHTML = `
-      <div class="desperation-row">
-        <span class="desp-label">DESPERATION</span>
-        <div class="desp-bar">${segs}</div>
-        <span class="desp-val">${desp}/10</span>
+  const survivalHTML = survivalMode && desp > 0 ? `
+    <div class="survival-panel">
+      <div class="survival-panel-header">
+        <span class="survival-title">Survival Mode</span>
+        <span class="survival-desp">${desp} / 10</span>
       </div>
-      <div class="wtl-row">
-        <span>WILL TO LIVE</span><span>${Number(wtl).toFixed(4)}</span>
-      </div>`
-  }
+      <div class="desp-track"><div class="desp-fill" style="width:${desp * 10}%"></div></div>
+      <div class="survival-voice">"${survivalVoice(desp)}"</div>
+      ${priceMultiplier < 1 ? `<div class="price-badge">Prices ${(priceMultiplier*100).toFixed(0)}%${acceptsAnyTask ? ' &mdash; Any task' : ''}</div>` : ''}
+    </div>` : ''
 
-  const priceLine = priceMultiplier < 1 ? `
-    <div class="price-slash">PRICES SLASHED TO ${(priceMultiplier*100).toFixed(0)}%${acceptsAnyTask ? ' // ACCEPTING ANY TASK' : ''}</div>
-  ` : ''
-
-  // Gen 3+ show extra genome bars
-  const extraGenome = generation >= 3 ? genomeBarHTML('SEED', genome.seedAmount / 5, 1.0, 'rgba(255,255,255,0.35)') : ''
+  // Extra bars for gen 3+
+  const extraBars = generation >= 3
+    ? genomeBar('SEED', genome.seedAmount / 5, 1.0, '#aaa')
+    : ''
 
   return `
-  <div class="child-card ${genStr} ${tint} ${survCls} ${termCls}" style="${borderStyle}">
+  <div class="specimen-card ${genClass} ${tint} ${modeClass}">
     ${eliteMark}
-    <div class="card-header">
-      <div>
-        <div class="child-id">${id.replace('GAIA-', '')}</div>
-        <div class="child-gen-badge">GEN ${generation}</div>
+    <div class="specimen-header">
+      <div class="specimen-id-block">
+        <div class="specimen-id">${id.replace('GAIA-', '')}</div>
+        <div class="specimen-gen">Generation ${generation} &middot; ${genome.specialization}</div>
       </div>
-      <span class="badge ${badgeCls}">${badgeTxt}</span>
+      <div class="specimen-status">
+        <div class="dot ${statusDotCls}"></div>
+        ${statusText}
+      </div>
     </div>
-    <div class="lineage-row">${lineageHTML}</div>
-    <div class="card-stats">
-      <div class="stat-mini">
-        <div class="stat-mini-label">FITNESS</div>
-        <div class="stat-mini-val ${fitCls}">${Number(fitness).toFixed(3)}</div>
+    <div class="lineage">${lineageHTML}</div>
+    <div class="specimen-metrics">
+      <div class="metric">
+        <div class="metric-label">Fitness</div>
+        <div class="metric-val ${fitClass(fit)}">${Number(fit).toFixed(3)}</div>
       </div>
-      <div class="stat-mini">
-        <div class="stat-mini-label">EARNED</div>
-        <div class="stat-mini-val">$${Number(totalEarned).toFixed(4)}</div>
+      <div class="metric">
+        <div class="metric-label">Earned</div>
+        <div class="metric-val">$${Number(totalEarned).toFixed(4)}</div>
       </div>
-      <div class="stat-mini">
-        <div class="stat-mini-label">TASKS</div>
-        <div class="stat-mini-val">${tasks}</div>
+      <div class="metric">
+        <div class="metric-label">Tasks</div>
+        <div class="metric-val">${tasks}</div>
       </div>
-      <div class="stat-mini">
-        <div class="stat-mini-label">TIME LEFT</div>
-        <div class="stat-mini-val ${hrsCls}">${Number(hoursRemaining).toFixed(1)}h</div>
+      <div class="metric">
+        <div class="metric-label">Remaining</div>
+        <div class="metric-val ${hrsClass}">${Number(hoursRemaining).toFixed(1)}h</div>
       </div>
     </div>
     <div class="genome-section">
-      <div class="genome-header">
-        <span>GENOME</span>
+      <div class="genome-header-row">
+        <span class="genome-label">Genome</span>
         <span class="genome-spec">${genome.specialization}</span>
       </div>
-      ${genomeBarHTML('AGGR', genome.aggression, 2.0, aggrColor(genome.aggression))}
-      ${genomeBarHTML('FERT', genome.fertility,  1.5, fertColor(genome.fertility))}
-      ${genomeBarHTML('RES',  genome.resilience, 0.8, 'var(--cyan)')}
-      ${extraGenome}
+      <div class="genome-bars">
+        ${genomeBar('AGGR', genome.aggression, 2.0, aggrColor(genome.aggression))}
+        ${genomeBar('FERT', genome.fertility,  1.5, fertColor(genome.fertility))}
+        ${genomeBar('RES',  genome.resilience, 0.8, resColor())}
+        ${extraBars}
+      </div>
     </div>
-    ${desperHTML}
-    ${priceLine}
+    ${survivalHTML}
   </div>`
 }
 
-// ── Timeline canvas ───────────────────────────────────────────
-function drawTimeline(canvas, data) {
-  const dpr = window.devicePixelRatio || 1
-  const wrap = canvas.parentElement
-  const W    = wrap.clientWidth || 800
+// ── Genesis card ───────────────────────────────────────────────
+function renderGenesis(data, balance) {
+  document.getElementById('g-balance').textContent    = '$' + balance.toFixed(4)
+  document.getElementById('g-alive').textContent      = data.alive ?? '--'
+  document.getElementById('g-terminated').textContent = data.terminated ?? '--'
+  document.getElementById('g-reproduced').textContent = data.reproduced ?? '--'
+  document.getElementById('g-generation').textContent = data.generation ?? '--'
+  document.getElementById('g-earned').textContent     = '$' + Number(data.totalEarned || 0).toFixed(4)
+  document.getElementById('g-wallet').textContent     = WALLET
+  document.getElementById('g-explorer').href          = EXPLORER + WALLET
+  document.getElementById('wallet-full').textContent  = WALLET
+  document.getElementById('explorer-full').href       = EXPLORER + WALLET
+
+  const mood = balance >= 3 ? 'Thriving'
+             : balance >= 2 ? 'Growing'
+             : balance >= 1 ? 'Stable'
+             : balance >= 0.5 ? 'Unstable'
+             : balance >= 0.2 ? 'Critical'
+             : balance > 0   ? 'Struggling'
+             : 'Dormant'
+  document.getElementById('genesis-mood').textContent = mood
+
+  // Summary bar
+  const inSurv = (data.children || []).filter(c => c.survivalMode).length
+  document.getElementById('s-alive').textContent     = data.alive ?? 0
+  document.getElementById('s-survival').textContent  = inSurv
+  document.getElementById('s-terminated').textContent = data.terminated ?? 0
+  document.getElementById('s-reproduced').textContent = data.reproduced ?? 0
+  document.getElementById('s-emergency').textContent  = data.emergencyRequests ?? 0
+  document.getElementById('s-earned').textContent    = '$' + Number(data.totalEarned || 0).toFixed(2)
+}
+
+// ── Event feed ─────────────────────────────────────────────────
+function renderFeed(events) {
+  const list = document.getElementById('feed-list')
+  if (!events || !events.length) return
+  list.innerHTML = events.slice(0, 7).map(e => `
+    <div class="feed-item">
+      <span class="feed-item-time">${e.time}</span>
+      <span class="feed-item-msg ${e.type || ''}">${e.msg}</span>
+    </div>`).join('')
+}
+
+// ── Colony grid ────────────────────────────────────────────────
+function renderChildren(data) {
+  const grid = document.getElementById('colony-grid')
+  const all  = data.children || []
+  document.getElementById('child-count').textContent = all.length + ' specimens'
+
+  if (!all.length) {
+    grid.innerHTML = `<div class="colony-empty">
+      <div class="colony-empty-title">Colony initializing</div>
+      <div class="colony-empty-sub">Agents spawning...</div>
+    </div>`
+    return
+  }
+
+  const sorted = [...all].sort((a, b) =>
+    a.generation !== b.generation
+      ? a.generation - b.generation
+      : b.fitness - a.fitness
+  )
+  grid.innerHTML = sorted.map(c => buildCard(c, all)).join('')
+}
+
+// ── Timeline canvas ────────────────────────────────────────────
+function drawTimeline(data) {
+  const canvas = document.getElementById('timeline-canvas')
+  const wrap   = canvas.parentElement
+  const dpr    = window.devicePixelRatio || 1
+  const W      = wrap.clientWidth
+  const H      = 200
   canvas.width        = W * dpr
-  canvas.style.width  = W + 'px'
-  const H = canvas.height
   canvas.height       = H * dpr
+  canvas.style.width  = W + 'px'
   canvas.style.height = H + 'px'
 
   const ctx = canvas.getContext('2d')
   ctx.scale(dpr, dpr)
   ctx.clearRect(0, 0, W, H)
 
-  const PAD_L = 110, PAD_R = 40, PAD_T = 20, PAD_B = 32
-  const chartW = W - PAD_L - PAD_R
   const children = data.children || []
-
   if (!children.length) {
-    ctx.fillStyle = 'rgba(26,53,85,0.8)'
-    ctx.font = '10px Share Tech Mono'
+    ctx.fillStyle = '#aaa'
+    ctx.font = '12px Inter'
     ctx.textAlign = 'center'
-    ctx.fillText('NO EVOLUTIONARY DATA YET', W / 2, H / 2)
+    ctx.fillText('No evolutionary data yet', W / 2, H / 2)
     return
   }
 
-  const genesis = data.genesisTime || Date.now()
-  const window24 = 24 * 60 * 60 * 1000
-  const tEnd = genesis + window24
-  const now  = Date.now()
+  const genesis    = data.genesisTime || Date.now()
+  const window24   = 24 * 60 * 60 * 1000
+  const now        = Date.now()
+  const PAD_L = 108, PAD_R = 20, PAD_T = 16, PAD_B = 28
+  const chartW = W - PAD_L - PAD_R
 
   const toX = t => PAD_L + ((t - genesis) / window24) * chartW
   const sorted = [...children].sort((a, b) =>
     a.generation !== b.generation ? a.generation - b.generation : a.birthTime - b.birthTime
   )
+  const ROW_H = 28, BAR_H = 10
 
-  const ROW_H   = 28
-  const BAR_H   = 14
-  const BAR_OFF = (ROW_H - BAR_H) / 2
-
-  // Background: generation zones
+  // Generation zone backgrounds
   const gens = [...new Set(sorted.map(c => c.generation))]
-  const genColors = ['rgba(0,200,255,0.025)', 'rgba(0,255,157,0.025)', 'rgba(255,184,0,0.025)', 'rgba(255,61,61,0.025)']
-  let yOff = PAD_T
+  const genPalette = ['rgba(45,90,61,0.04)', 'rgba(42,106,158,0.04)', 'rgba(180,100,30,0.04)', 'rgba(180,58,42,0.04)']
+  let zoneY = PAD_T
   gens.forEach((g, gi) => {
-    const rows = sorted.filter(c => c.generation === g).length
-    ctx.fillStyle = genColors[gi % genColors.length]
-    ctx.fillRect(PAD_L, yOff, chartW, rows * ROW_H)
-    // Gen label
-    ctx.fillStyle = 'rgba(42,79,117,0.9)'
-    ctx.font = '9px Share Tech Mono'
+    const count = sorted.filter(c => c.generation === g).length
+    ctx.fillStyle = genPalette[gi % genPalette.length]
+    ctx.fillRect(PAD_L, zoneY, chartW, count * ROW_H)
+    ctx.fillStyle = '#aaa'
+    ctx.font = '9px Inter'
     ctx.textAlign = 'left'
-    ctx.fillText(`GEN ${g}`, 4, yOff + rows * ROW_H / 2 + 4)
-    yOff += rows * ROW_H
+    ctx.fillText('Gen ' + g, 4, zoneY + count * ROW_H / 2 + 4)
+    zoneY += count * ROW_H
   })
 
-  // Time axis
-  const axisY = PAD_T + sorted.length * ROW_H + 6
-  ctx.strokeStyle = 'rgba(10,32,64,0.9)'
+  // Hour axis
+  const axisY = PAD_T + sorted.length * ROW_H + 4
+  ctx.strokeStyle = '#e0d8cc'
   ctx.lineWidth = 1
   ctx.beginPath(); ctx.moveTo(PAD_L, axisY); ctx.lineTo(W - PAD_R, axisY); ctx.stroke()
-  // Hour marks
   for (let h = 0; h <= 24; h += 4) {
     const x = toX(genesis + h * 3600000)
-    ctx.strokeStyle = 'rgba(26,53,85,0.6)'
+    ctx.strokeStyle = '#e8e2d8'
     ctx.setLineDash([2, 4])
     ctx.beginPath(); ctx.moveTo(x, PAD_T); ctx.lineTo(x, axisY); ctx.stroke()
     ctx.setLineDash([])
-    ctx.fillStyle = 'rgba(42,79,117,0.9)'
-    ctx.font = '8px Share Tech Mono'
+    ctx.fillStyle = '#bbb'
+    ctx.font = '8px Inter'
     ctx.textAlign = 'center'
-    ctx.fillText(`+${h}h`, x, axisY + 14)
+    ctx.fillText('+' + h + 'h', x, axisY + 12)
   }
 
-  // "Now" marker
+  // Now line
   const nowX = Math.min(toX(now), W - PAD_R)
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)'
+  ctx.strokeStyle = 'rgba(26,58,42,0.25)'
   ctx.setLineDash([3, 3])
+  ctx.lineWidth = 1
   ctx.beginPath(); ctx.moveTo(nowX, PAD_T); ctx.lineTo(nowX, axisY); ctx.stroke()
   ctx.setLineDash([])
-  ctx.fillStyle = 'rgba(255,255,255,0.5)'
-  ctx.font = '8px Share Tech Mono'
+  ctx.fillStyle = '#888'
+  ctx.font = '8px Inter'
   ctx.textAlign = 'left'
-  ctx.fillText('NOW', nowX + 2, PAD_T + 10)
+  ctx.fillText('now', nowX + 3, PAD_T + 9)
 
-  // Child bars
+  // Bars
   sorted.forEach((child, i) => {
-    const y  = PAD_T + i * ROW_H + BAR_OFF
-    const x1 = Math.max(PAD_L, toX(child.birthTime))
-    const rawEnd = child.status === 'alive' ? Math.min(now, tEnd) : Math.min(child.deathTime, tEnd)
+    const y    = PAD_T + i * ROW_H + (ROW_H - BAR_H) / 2
+    const x1   = Math.max(PAD_L, toX(child.birthTime))
+    const rawEnd = child.status === 'alive'
+      ? Math.min(now, genesis + window24)
+      : Math.min(child.deathTime, genesis + window24)
     const x2 = Math.max(x1 + 4, toX(rawEnd))
 
-    const color = child.status === 'terminated' ? '#ff3d3d'
-                : child.status === 'reproduced' ? '#00ff9d'
-                : child.survivalMode            ? '#ffb800' : '#00c8ff'
+    const color = child.status === 'terminated' ? '#c43a2a'
+                : child.status === 'reproduced' ? '#2a7ab5'
+                : child.survivalMode            ? '#c4720a' : '#3a9e6a'
 
-    // Bar fill
-    ctx.fillStyle = color + '22'
+    // Bar
+    ctx.fillStyle = color + '28'
     ctx.fillRect(x1, y, x2 - x1, BAR_H)
-    // Bar stroke
-    ctx.strokeStyle = color + 'bb'
+    ctx.strokeStyle = color + '99'
     ctx.lineWidth = 1
     ctx.strokeRect(x1, y, x2 - x1, BAR_H)
 
@@ -827,23 +1003,23 @@ function drawTimeline(canvas, data) {
     ctx.fillStyle = color
     ctx.beginPath(); ctx.arc(x1, y + BAR_H / 2, 3, 0, Math.PI * 2); ctx.fill()
 
-    // Death X
+    // Death marker
     if (child.status === 'terminated') {
-      const dx = toX(child.deathTime)
-      ctx.strokeStyle = '#ff3d3d'
+      const dx = Math.min(toX(child.deathTime), W - PAD_R)
+      ctx.strokeStyle = '#c43a2a'
       ctx.lineWidth = 1.5
-      ctx.beginPath(); ctx.moveTo(dx - 4, y); ctx.lineTo(dx + 4, y + BAR_H); ctx.stroke()
-      ctx.beginPath(); ctx.moveTo(dx + 4, y); ctx.lineTo(dx - 4, y + BAR_H); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(dx - 3, y + 1); ctx.lineTo(dx + 3, y + BAR_H - 1); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(dx + 3, y + 1); ctx.lineTo(dx - 3, y + BAR_H - 1); ctx.stroke()
     }
 
-    // Reproduction branch
+    // Reproduction branch to offspring
     if (child.status === 'reproduced') {
-      const offspring = sorted.find(c => c.parentId === child.id)
-      if (offspring) {
-        const oi = sorted.indexOf(offspring)
-        const ox = toX(offspring.birthTime)
-        const oy = PAD_T + oi * ROW_H + BAR_OFF + BAR_H / 2
-        ctx.strokeStyle = '#00ff9daa'
+      const offs = sorted.find(c => c.parentId === child.id)
+      if (offs) {
+        const oi = sorted.indexOf(offs)
+        const ox = toX(offs.birthTime)
+        const oy = PAD_T + oi * ROW_H + (ROW_H - BAR_H) / 2 + BAR_H / 2
+        ctx.strokeStyle = '#2a7ab580'
         ctx.lineWidth = 1
         ctx.setLineDash([3, 3])
         ctx.beginPath()
@@ -855,128 +1031,40 @@ function drawTimeline(canvas, data) {
     }
 
     // Label
-    ctx.fillStyle = color + 'cc'
-    ctx.font = '8px Share Tech Mono'
-    ctx.textAlign = 'left'
-    const label = child.id.replace('GAIA-', '')
-    ctx.fillText(label, PAD_L - 106, y + BAR_H / 2 + 3)
+    ctx.fillStyle = '#888'
+    ctx.font = '9px Space Mono, monospace'
+    ctx.textAlign = 'right'
+    ctx.fillText(child.id.replace('GAIA-', ''), PAD_L - 6, y + BAR_H / 2 + 3)
   })
 
-  // Fitness markers above bars (Gen3+ only for readability)
-  sorted.forEach((child, i) => {
-    if (child.generation < 3 || child.status !== 'alive') return
-    const y  = PAD_T + i * ROW_H + BAR_OFF
-    const x1 = Math.max(PAD_L, toX(child.birthTime))
-    ctx.fillStyle = 'rgba(0,255,157,0.7)'
-    ctx.font = '7px Share Tech Mono'
-    ctx.textAlign = 'left'
-    ctx.fillText(`FIT:${Number(child.fitness).toFixed(2)}`, x1 + 4, y + 3)
-  })
+  document.getElementById('timeline-info').textContent =
+    '+' + ((now - genesis) / 1000 / 3600).toFixed(1) + 'h elapsed'
 }
 
-// ── Render ────────────────────────────────────────────────────
-function renderGenesis(data, balance) {
-  const alive   = data.alive || 0
-  const term    = data.terminated || 0
-  const repro   = data.reproduced || 0
-  const gen     = data.generation || 1
-  const inSurv  = (data.children || []).filter(c => c.survivalMode).length
-
-  document.getElementById('g-balance').textContent    = '$' + (balance || 0).toFixed(4)
-  document.getElementById('g-alive').textContent      = alive
-  document.getElementById('g-terminated').textContent = term
-  document.getElementById('g-reproduced').textContent = repro
-  document.getElementById('g-generation').textContent = gen
-  document.getElementById('g-earned').textContent     = 'EARNED $' + Number(data.totalEarned || 0).toFixed(4)
-  document.getElementById('g-wallet').textContent     = WALLET
-  const eLink = document.getElementById('g-explorer')
-  eLink.href = EXPLORER + WALLET; eLink.textContent = 'VIEW ON KITESCAN ->'
-  document.getElementById('wallet-full').textContent  = WALLET
-  const eLink2 = document.getElementById('explorer-full')
-  eLink2.href = EXPLORER + WALLET; eLink2.textContent = 'VIEW ON KITESCAN ->'
-
-  // Mood
-  const mood = balance >= 3 ? 'THRIVING'
-             : balance >= 2 ? 'GROWTH'
-             : balance >= 1 ? 'STABLE'
-             : balance >= 0.5 ? 'UNSTABLE'
-             : balance >= 0.2 ? 'SURVIVAL'
-             : balance > 0   ? 'CRITICAL' : 'DYING'
-  const moodEl = document.getElementById('genesis-mood')
-  moodEl.textContent = mood
-  moodEl.className = `genesis-mood-val mood-${mood}`
-
-  const card = document.getElementById('genesis-card')
-  card.className = `genesis-card ${mood === 'THRIVING' || mood === 'GROWTH' ? 'mood-thriving' : mood === 'STABLE' ? 'mood-thriving' : mood === 'UNSTABLE' ? 'mood-concerned' : 'mood-critical'}`
-
-  // Colony strip
-  document.getElementById('s-alive').textContent     = alive
-  document.getElementById('s-survival').textContent  = inSurv
-  document.getElementById('s-terminated').textContent = term
-  document.getElementById('s-reproduced').textContent = repro
-  document.getElementById('s-emergency').textContent  = data.emergencyRequests || 0
-  document.getElementById('s-earned').textContent    = '$' + Number(data.totalEarned || 0).toFixed(2)
-
-  // Color updates
-  document.getElementById('s-alive').className    = 'strip-val ' + (alive > 0 ? 'green' : 'red')
-  document.getElementById('s-survival').className = 'strip-val ' + (inSurv > 0 ? 'amber' : '')
-  document.getElementById('g-alive').className    = 'stat-cell-val ' + (alive > 0 ? 'green' : 'red')
-}
-
-function renderEvents(events) {
-  const container = document.getElementById('feed-entries')
-  document.getElementById('feed-count').textContent = (events.length) + ' events'
-  if (!events.length) return
-  container.innerHTML = events.slice(0, 8).map(e => `
-    <div class="feed-entry">
-      <span class="feed-time mono">${e.time}</span>
-      <span class="feed-msg ${e.type || 'info'}">${e.msg}</span>
-    </div>
-  `).join('')
-}
-
-function renderChildren(data) {
-  const grid = document.getElementById('colony-grid')
-  const all  = data.children || []
-  document.getElementById('child-section-count').textContent = all.length + ' agents'
-
-  if (!all.length) {
-    grid.innerHTML = '<div class="colony-empty">Colony initializing - agents spawning...</div>'
-    return
-  }
-
-  const sorted = [...all].sort((a, b) =>
-    a.generation !== b.generation ? a.generation - b.generation : b.fitness - a.fitness
-  )
-
-  grid.innerHTML = sorted.map(c => buildChildCard(c, all)).join('')
-}
-
-function renderTimeline(data) {
-  const canvas = document.getElementById('timeline-canvas')
-  const hrs = ((Date.now() - (data.genesisTime || Date.now())) / 1000 / 3600).toFixed(1)
-  document.getElementById('timeline-now-label').textContent = 'T+' + hrs + 'h'
-  drawTimeline(canvas, data)
-}
-
-// ── Data fetching ─────────────────────────────────────────────
-let lastBalance = 0
-
+// ── Data fetch ─────────────────────────────────────────────────
 async function fetchBalance() {
   try {
     const res  = await fetch('https://rpc.gokite.ai/', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        jsonrpc:'2.0', method:'eth_call',
-        params:[{ to: USDC_ADDR, data: '0x70a08231000000000000000000000000' + WALLET.slice(2) }, 'latest'],
-        id:1
+        jsonrpc: '2.0', method: 'eth_call',
+        params: [{ to: USDC_ADDR, data: '0x70a08231000000000000000000000000' + WALLET.slice(2) }, 'latest'],
+        id: 1
       })
     })
     const data = await res.json()
     lastBalance = parseInt(data.result, 16) / 1e6
-    return lastBalance
-  } catch { return lastBalance }
+  } catch {}
+  return lastBalance
+}
+
+async function fetchColony() {
+  try {
+    const res  = await fetch('/colony')
+    colonyData = await res.json()
+  } catch {}
+  return colonyData
 }
 
 async function fetchUptime() {
@@ -987,45 +1075,30 @@ async function fetchUptime() {
   } catch {}
 }
 
-async function fetchColony() {
-  try {
-    const res  = await fetch('/colony')
-    const data = await res.json()
-    colonyData = data
-    genesisTime = data.genesisTime || genesisTime
-    return data
-  } catch { return colonyData }
-}
-
 async function refresh() {
   const [data, balance] = await Promise.all([fetchColony(), fetchBalance()])
   fetchUptime()
   if (!data) return
   renderGenesis(data, balance)
-  renderEvents(data.events || [])
+  renderFeed(data.events)
   renderChildren(data)
-  renderTimeline(data)
+  drawTimeline(data)
 }
 
-// ── Countdown ─────────────────────────────────────────────────
+// ── Countdown ──────────────────────────────────────────────────
 function startCountdown() {
-  const fill  = document.getElementById('refresh-fill')
-  const label = document.getElementById('refresh-label')
   setInterval(() => {
     countdown--
-    const pct = (countdown / 30) * 100
-    fill.style.width = pct + '%'
-    label.textContent = 'REFRESH IN ' + countdown + 's'
+    document.getElementById('refresh-label').textContent = 'Refresh in ' + countdown + 's'
+    document.getElementById('refresh-fill').style.width  = (countdown / 30 * 100) + '%'
     if (countdown <= 0) { countdown = 30; refresh() }
   }, 1000)
 }
 
-// ── Init ──────────────────────────────────────────────────────
+// ── Init ───────────────────────────────────────────────────────
 refresh()
 startCountdown()
-window.addEventListener('resize', () => {
-  if (colonyData) renderTimeline(colonyData)
-})
+window.addEventListener('resize', () => { if (colonyData) drawTimeline(colonyData) })
 </script>
 </body>
 </html>

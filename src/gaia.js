@@ -49,9 +49,8 @@ function spawnInitialChildren(count = 3) {
   for (let i = 0; i < count; i++) {
     const child = spawnChild(null, 1, null)
     colony.children.push(child)
-    const msg = `Genesis spawned ${child.id} | spec=${child.genome.specialization} seed=$${child.genome.seedAmount}`
-    console.log(`[GENESIS] ${msg}`)
-    colonyEvent(msg, 'info')
+    console.log(`[GENESIS] Spawned ${child.id} | spec=${child.genome.specialization} seed=$${child.genome.seedAmount}`)
+    colonyEvent(`Spawned ${child.id.replace('GAIA-','')} — ${child.genome.specialization}, seed $${child.genome.seedAmount}`, 'info')
   }
 }
 
@@ -66,18 +65,16 @@ async function runColonyCycle() {
       runClawEarn: runClawEarnFn,
     })
     if (!wasInSurvival && child.survivalMode) {
-      const desp = desperationLevel(child)
-      const msg = `${child.id} entered SURVIVAL MODE | desp=${desp}/10`
-      colonyEvent(msg, 'warn')
+      const hrs = (timeRemaining(child) / 1000 / 3600).toFixed(1)
+      colonyEvent(`${child.id.replace('GAIA-','')} entered survival mode — ${hrs}h remaining, fitness ${fitness(child).toFixed(3)}`, 'warn')
     }
 
     if (shouldTerminate(child)) {
       child.status = 'terminated'
       colony.terminated++
       const fit = fitness(child).toFixed(3)
-      const msg = `${child.id} self-terminated | fitness=${fit} earned=$${child.totalEarned.toFixed(4)}`
-      console.log(`[COLONY] ${msg}`)
-      colonyEvent(msg, 'danger')
+      console.log(`[COLONY] ${child.id} self-terminated | fitness=${fit} earned=$${child.totalEarned.toFixed(4)}`)
+      colonyEvent(`${child.id.replace('GAIA-','')} terminated — fitness ${fit}, earned $${child.totalEarned.toFixed(4)}`, 'danger')
       continue
     }
 
@@ -87,9 +84,8 @@ async function runColonyCycle() {
       colony.generation = Math.max(colony.generation, child.generation + 1)
       const offspring = spawnChild(child.genome, child.generation + 1, child.id)
       colony.children.push(offspring)
-      const msg = `${child.id} reproduced -> ${offspring.id} | gen=${offspring.generation}`
-      console.log(`[EVOLUTION] ${msg}`)
-      colonyEvent(msg, 'success')
+      console.log(`[EVOLUTION] ${child.id} reproduced -> ${offspring.id}`)
+      colonyEvent(`${child.id.replace('GAIA-','')} reproduced -> ${offspring.id.replace('GAIA-','')} (Gen ${offspring.generation})`, 'success')
     }
   }
 
@@ -144,18 +140,15 @@ function adjustPricing(mode) {
 
 function emergencySurvival() {
   memory.survivalAttempts++
-  const msg = `Genesis emergency survival #${memory.survivalAttempts} — slashing prices`
-  console.log(`[GENESIS-CRITICAL] ${msg}`)
-  colonyEvent(msg, 'danger')
+  console.log(`[GENESIS-CRITICAL] Emergency survival #${memory.survivalAttempts}`)
+  if (memory.survivalAttempts === 1) {
+    colonyEvent('Genesis balance critical — emergency pricing active', 'danger')
+  }
 }
 
 function growthMode() {
   const best = Object.entries(memory.successfulServices).sort(([, a], [, b]) => b - a)[0]
-  if (best) {
-    const msg = `Top service: ${best[0]} (${best[1]} calls)`
-    console.log(`[GROWTH] ${msg}`)
-    colonyEvent(msg, 'info')
-  }
+  if (best) console.log(`[GROWTH] Top service: ${best[0]} (${best[1]} calls)`)
 }
 
 function thrivingMode() {
@@ -163,15 +156,13 @@ function thrivingMode() {
     price: '0.50',
     description: 'Deep analysis - Premium tier (GAIA evolved)',
   }
-  const msg = `Gen ${colony.generation} — Premium Analysis unlocked`
-  console.log(`[EVOLUTION] ${msg}`)
-  colonyEvent(msg, 'success')
+  console.log(`[EVOLUTION] Gen ${colony.generation} — Premium Analysis unlocked`)
+  colonyEvent(`Generation ${colony.generation} — Premium Analysis unlocked`, 'success')
 
   const child = spawnChild(null, colony.generation, null)
   colony.children.push(child)
-  const spawnMsg = `Auto-spawned ${child.id} from thriving Genesis`
-  console.log(`[GENESIS] ${spawnMsg}`)
-  colonyEvent(spawnMsg, 'info')
+  console.log(`[GENESIS] Auto-spawned ${child.id} from thriving Genesis`)
+  colonyEvent(`Auto-spawned ${child.id.replace('GAIA-','')} — colony thriving`, 'info')
 }
 
 async function think(balance) {

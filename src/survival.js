@@ -42,7 +42,13 @@ function willToLive(child) {
   return parseFloat(Math.min(1.0, timeUrgency + fitDesperation * 0.4).toFixed(4))
 }
 
+function ageMs(child) {
+  return Date.now() - child.birthTime
+}
+
 function isSurvivalMode(child) {
+  // Grace period: no survival pressure for the first 6 hours
+  if (ageMs(child) < SIX_HOURS_MS) return false
   return fitness(child) < 0.5 || timeRemaining(child) < SIX_HOURS_MS
 }
 
