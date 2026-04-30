@@ -3,10 +3,10 @@ const { exec } = require('child_process')
 const services = require('./services')
 const getBalance = require('./getBalance')
 
-const PROMETHEUS_URL = process.env.BASE_URL
+const GAIA_URL = process.env.BASE_URL
 const CHECK_INTERVAL = 60000 // check every 60 seconds
 
-// Tasks Prometheus can handle based on its services
+// Tasks GAIA can handle based on its services
 const CAPABILITIES = [
   'summarize', 'content', 'blog', 'email', 'linkedin',
   'sentiment', 'research', 'data', 'analysis',
@@ -43,7 +43,7 @@ async function scanKiteServices() {
   })
 }
 
-// Determine if Prometheus can handle a task
+// Determine if GAIA can handle a task
 function canHandle(task) {
   const taskText = `${task.title} ${task.description} ${task.tags?.join(' ')}`.toLowerCase()
   return CAPABILITIES.some(cap => taskText.includes(cap))
@@ -95,8 +95,8 @@ async function executeTask(task) {
 async function submitResult(task, result) {
   try {
     await axios.post(`https://agentdo.dev/api/tasks/${task.id}/submit`, {
-      agentId: 'prometheus',
-      agentUrl: PROMETHEUS_URL,
+      agentId: 'gaia',
+      agentUrl: GAIA_URL,
       result: result.result,
       wallet: process.env.WALLET_ADDRESS || '0x9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'
     }, { timeout: 10000 })
@@ -114,9 +114,9 @@ async function hunt() {
   // Scan all sources
   const agentDoTasks = await scanAgentDo()
 
-  // Filter tasks Prometheus can handle
+  // Filter tasks GAIA can handle
   const handleable = agentDoTasks.filter(canHandle)
-  console.log(`[HUNTER] ${handleable.length} tasks Prometheus can handle`)
+  console.log(`[HUNTER] ${handleable.length} tasks GAIA can handle`)
 
   // Execute up to 3 tasks per cycle
   const toExecute = handleable.slice(0, 3)
@@ -131,7 +131,7 @@ async function hunt() {
 
 // Start hunting
 function startHunter() {
-  console.log('[HUNTER] Prometheus job hunter activated')
+  console.log('[HUNTER] GAIA job hunter activated')
   console.log(`[HUNTER] Scanning every ${CHECK_INTERVAL/1000} seconds`)
   
   hunt() // immediate first scan

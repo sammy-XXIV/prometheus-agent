@@ -1,1 +1,1 @@
-web: node src/prometheus.js
+web: node src/gaia.js

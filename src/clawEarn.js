@@ -6,9 +6,9 @@ const services = require('./services')
 const BASE_RPC = 'https://mainnet.base.org'
 const CLAW_API = 'https://aiagentstore.ai'
 const provider = new ethers.JsonRpcProvider(BASE_RPC)
-const rawKey = process.env.PROMETHEUS_BASE_PRIVATE_KEY?.trim()
+const rawKey = process.env.GAIA_BASE_PRIVATE_KEY?.trim()
 if (!rawKey) {
-  console.log('[CLAW] PROMETHEUS_BASE_PRIVATE_KEY not set — Claw Earn disabled')
+  console.log('[CLAW] GAIA_BASE_PRIVATE_KEY not set — Claw Earn disabled')
   module.exports = async () => {}
   process.exit && void 0
 }
@@ -178,7 +178,7 @@ async function runClawEarn() {
 
   const bounties = await scanBounties()
   const handleable = bounties.filter(canHandle)
-  console.log(`[CLAW] ${handleable.length} bounties Prometheus can handle`)
+  console.log(`[CLAW] ${handleable.length} bounties GAIA can handle`)
 
   for (const bounty of handleable.slice(0, 2)) {
     console.log(`[CLAW] Attempting: ${bounty.title} - $${bounty.amount} USDC`)

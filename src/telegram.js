@@ -99,9 +99,9 @@ const userState = {}
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id
   bot.sendMessage(chatId,
-    `PROMETHEUS - Autonomous AI Agent\n\n` +
-    `26 professional services powered by AI.\n` +
-    `Pay in USDC on Kite chain.\n\n` +
+    `GAIA - Self-Evolving AI Lifeform\n\n` +
+    `The Genesis agent on Kite blockchain.\n` +
+    `26 services powered by AI. Pay in USDC.\n\n` +
     `Wallet: ${PAYMENT_ADDRESS}\n\n` +
     `Select a category:`,
     serviceMenu()
@@ -114,7 +114,7 @@ bot.onText(/\/services/, (msg) => {
 
 bot.onText(/\/balance/, (msg) => {
   bot.sendMessage(msg.chat.id,
-    `Prometheus Wallet: ${PAYMENT_ADDRESS}\n` +
+    `GAIA Wallet: ${PAYMENT_ADDRESS}\n` +
     `Explorer: https://kitescan.ai/address/${PAYMENT_ADDRESS}`
   )
 })
@@ -124,11 +124,11 @@ bot.onText(/\/help/, (msg) => {
     `Commands:\n` +
     `/start - Welcome\n` +
     `/services - Browse all services\n` +
-    `/balance - View Prometheus wallet\n` +
+    `/balance - View GAIA Genesis wallet\n` +
     `/help - This menu\n\n` +
     `How it works:\n` +
     `1. Pick a service\n` +
-    `2. Send USDC to Prometheus wallet on Kite chain\n` +
+    `2. Send USDC to GAIA wallet on Kite chain\n` +
     `3. Send tx hash + your input\n` +
     `4. Get your result`
   )
@@ -169,13 +169,14 @@ bot.on('callback_query', async (query) => {
 
     bot.sendMessage(chatId,
       `Service: ${service.description}\n` +
-      `Price: $${service.price} USDC\n\n` +
-      `To pay:\n` +
-      `1. Send $${service.price} USDC to:\n` +
+      `Price: $${service.price}\n\n` +
+      `Pay with crypto (USDC on Kite):\n` +
+      `Send $${service.price} USDC to:\n` +
       `${PAYMENT_ADDRESS}\n` +
-      `(Kite network only)\n\n` +
-      `2. Reply with your tx hash and input:\n` +
-      `TXHASH | your input here`
+      `Then reply: TXHASH | your input\n\n` +
+      `Pay with card (Stripe):\n` +
+      `Reply: CARD | your input\n` +
+      `You'll get a secure checkout link.`
     )
   }
 
@@ -191,13 +192,32 @@ bot.on('message', async (msg) => {
   if (!state || state.step !== 'awaiting_payment') return
 
   if (!text.includes('|')) {
-    bot.sendMessage(chatId, 'Please use the format: TXHASH | your input')
+    bot.sendMessage(chatId, 'Pay with crypto: TXHASH | your input\nPay with card: CARD | your input')
     return
   }
 
-  const [txHash, ...inputParts] = text.split('|')
+  const [method, ...inputParts] = text.split('|')
   const input = inputParts.join('|').trim()
-  const tx = txHash.trim()
+
+  // Card payment via Stripe
+  if (method.trim().toUpperCase() === 'CARD') {
+    try {
+      const { createCheckoutSession } = require('./stripe')
+      bot.sendMessage(chatId, 'Creating secure checkout link...')
+      const session = await createCheckoutSession(state.service, input)
+      delete userState[chatId]
+      const base = process.env.BASE_URL || 'http://localhost:3000'
+      bot.sendMessage(chatId,
+        `Pay by card:\n${session.url}\n\n` +
+        `After paying your result will be at:\n${base}/result/${session.sessionId}`
+      )
+    } catch (e) {
+      bot.sendMessage(chatId, `Stripe error: ${e.message}`)
+    }
+    return
+  }
+
+  const tx = method.trim()
 
   bot.sendMessage(chatId, 'Verifying payment and processing...')
 
@@ -256,5 +276,5 @@ bot.on('message', async (msg) => {
   }
 })
 
-console.log('[TELEGRAM] Prometheus bot running...')
+console.log('[TELEGRAM] GAIA bot running...')
 module.exports = bot

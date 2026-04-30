@@ -8,7 +8,7 @@ const ERC20_ABI = [
 ]
 
 const USDC_ADDRESS = '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e'
-const PROMETHEUS_WALLET = '0x9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'
+const GAIA_WALLET = '0x9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'
 const PAYMENT_WINDOW_SECONDS = 300 // payment must be within last 5 minutes
 
 async function verifyPayment(txHash, expectedAmount) {
@@ -29,11 +29,11 @@ async function verifyPayment(txHash, expectedAmount) {
 
     // Check for USDC transfer to Prometheus
     const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, provider)
-    const filter = usdc.filters.Transfer(null, PROMETHEUS_WALLET)
+    const filter = usdc.filters.Transfer(null, GAIA_WALLET)
     const events = await usdc.queryFilter(filter, receipt.blockNumber, receipt.blockNumber)
 
     const payment = events.find(e => e.transactionHash === txHash)
-    if (!payment) return { valid: false, reason: 'No USDC transfer to Prometheus found' }
+    if (!payment) return { valid: false, reason: 'No USDC transfer to GAIA found' }
 
     // Verify amount is sufficient
     const paid = parseFloat(ethers.formatUnits(payment.args.value, 6))

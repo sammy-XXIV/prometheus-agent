@@ -5,10 +5,14 @@ const config = require('./config')
 const services = require('./services')
 const verifyPayment = require('./verify')
 const { handleWebhook: atrestWebhook } = require('./atrest')
+const { createCheckoutSession, handleWebhook: stripeWebhook, getResultForSession } = require('./stripe')
 
 const app = express()
 const cors = require('cors')
 app.use(cors())
+
+// Stripe webhook must receive the raw body before express.json() parses it
+app.use('/webhook/stripe', express.raw({ type: 'application/json' }))
 app.use(express.json())
 
 function paymentWall(serviceKey) {
@@ -28,7 +32,7 @@ function paymentWall(serviceKey) {
           payTo: config.walletAddress,
           asset: '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e',
           maxTimeoutSeconds: 300,
-          merchantName: 'Prometheus'
+          merchantName: 'GAIA'
         }],
         x402Version: 1
       })
@@ -55,6 +59,62 @@ app.post('/webhook/atrest', async (req, res) => {
   }
 })
 
+// Stripe webhook — raw body required (middleware set above)
+app.post('/webhook/stripe', async (req, res) => {
+  try {
+    const result = await stripeWebhook(req.body, req.headers['stripe-signature'])
+    if (result.error) return res.status(400).json(result)
+    res.json(result)
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Card payment — create Stripe Checkout session
+// POST /pay/card  { service: 'audit', input: '...' }
+app.post('/pay/card', async (req, res) => {
+  try {
+    const { service, input } = req.body
+    if (!service || !input) return res.status(400).json({ error: 'service and input required' })
+    if (!config.services[service]) return res.status(404).json({ error: 'Unknown service' })
+    const session = await createCheckoutSession(service, input)
+    res.json(session)
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Result page — shown after Stripe success_url redirect
+app.get('/result/:sessionId', async (req, res) => {
+  try {
+    const data = await getResultForSession(req.params.sessionId)
+
+    if (data.status === 'unpaid') {
+      return res.status(402).send('<h2>Payment not confirmed yet. Please wait a moment and refresh.</h2>')
+    }
+    if (data.status === 'running' || data.status === 'pending') {
+      return res.send('<h2>Processing your request... refresh in a few seconds.</h2>')
+    }
+    if (data.status === 'error') {
+      return res.status(500).send(`<h2>Error: ${data.error || data.result}</h2>`)
+    }
+
+    const escaped = String(data.result).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    res.send(
+      `<!DOCTYPE html><html><head><title>GAIA Result</title>` +
+      `<style>body{font-family:monospace;max-width:800px;margin:40px auto;padding:0 20px;background:#0a0a0a;color:#e0e0e0}` +
+      `h2{color:#7fff7f}pre{white-space:pre-wrap;background:#111;padding:20px;border-radius:6px;border:1px solid #333}` +
+      `small{color:#666}</style></head><body>` +
+      `<h2>GAIA — ${config.services[data.service]?.description || data.service}</h2>` +
+      `<pre>${escaped}</pre>` +
+      `<small><a href="/services" style="color:#7fff7f">← Back to services</a></small>` +
+      `</body></html>`
+    )
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // Dashboard
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, '../src/dashboard.html'))
@@ -63,7 +123,7 @@ app.get('/dashboard', (req, res) => {
 // Free endpoints
 app.get('/', (req, res) => {
   res.json({
-    name: 'Prometheus',
+    name: 'GAIA',
     status: 'alive',
     version: '1.0.0',
     wallet: config.walletAddress,
@@ -113,7 +173,7 @@ app.post('/sentiment',      paymentWall('sentiment'),       async (req, res) => 
 app.post('/advice',         paymentWall('advice'),          async (req, res) => { try { res.json({ result: await services.advice(req.body.topic) }) } catch(e) { res.status(500).json({ error: e.message }) }})
 
 app.listen(config.port, () => {
-  console.log(`Prometheus serving ${Object.keys(config.services).length} services on port ${config.port}`)
+  console.log(`GAIA serving ${Object.keys(config.services).length} services on port ${config.port}`)
 })
 
 module.exports = app

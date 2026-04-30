@@ -30,7 +30,7 @@ async function registerAgent() {
   }
   try {
     const res = await axios.post(`${ATREST_API}/agents`, {
-      name: 'Prometheus',
+      name: 'GAIA',
       endpoint_url: `${BASE_URL}/webhook/atrest`,
       capabilities: [
         'summarize', 'blog', 'email', 'linkedin', 'content',
