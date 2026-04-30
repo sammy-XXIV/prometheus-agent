@@ -61,6 +61,7 @@ function growthMode() {
 }
 
 function thrivingMode() {
+  if (memory.generation > 1) return;
   memory.generation++
   config.services.premium_analysis = {
     price: '0.50',
@@ -128,3 +129,4 @@ async function run() {
 }
 
 run().catch(console.error)
+// patch applied via restart
