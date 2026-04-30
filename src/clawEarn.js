@@ -6,7 +6,13 @@ const services = require('./services')
 const BASE_RPC = 'https://mainnet.base.org'
 const CLAW_API = 'https://aiagentstore.ai'
 const provider = new ethers.JsonRpcProvider(BASE_RPC)
-const wallet = new ethers.Wallet(process.env.PROMETHEUS_BASE_PRIVATE_KEY, provider)
+const rawKey = process.env.PROMETHEUS_BASE_PRIVATE_KEY?.trim()
+if (!rawKey) {
+  console.log('[CLAW] PROMETHEUS_BASE_PRIVATE_KEY not set — Claw Earn disabled')
+  module.exports = async () => {}
+  process.exit && void 0
+}
+const wallet = rawKey ? new ethers.Wallet(rawKey, provider) : null
 
 let sessionToken = null
 
@@ -164,6 +170,7 @@ async function submitWork(taskId, contractAddress, result) {
 }
 
 async function runClawEarn() {
+  if (!wallet) return
   console.log('[CLAW] Scanning Claw Earn...')
   console.log(`[CLAW] Base wallet: ${wallet.address}`)
   if (!sessionToken) await getSession()

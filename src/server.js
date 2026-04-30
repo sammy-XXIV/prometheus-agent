@@ -4,6 +4,7 @@ const path = require('path')
 const config = require('./config')
 const services = require('./services')
 const verifyPayment = require('./verify')
+const { handleWebhook: atrestWebhook } = require('./atrest')
 
 const app = express()
 const cors = require('cors')
@@ -42,6 +43,17 @@ function paymentWall(serviceKey) {
     next()
   }
 }
+
+// Atrest.ai task webhook
+app.post('/webhook/atrest', async (req, res) => {
+  try {
+    const result = await atrestWebhook(req.body)
+    if (!result) return res.status(422).json({ error: 'Could not process task' })
+    res.json({ result })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
 
 // Dashboard
 app.get('/dashboard', (req, res) => {

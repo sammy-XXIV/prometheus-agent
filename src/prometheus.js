@@ -118,6 +118,8 @@ async function run() {
   const startHunter = require('./hunter')
   startHunter()
   require('./telegram')
+  const { startAtrest } = require('./atrest')
+  startAtrest()
 
   let balance = await getBalance()
   memory.lastBalance = balance
