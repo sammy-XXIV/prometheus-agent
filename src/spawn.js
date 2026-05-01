@@ -44,6 +44,9 @@ function spawnChild(parentGenome = null, generation = 1, parentId = null) {
     totalEarned: 0,
     tasks: 0,
     seedTx: null,
+    walletAddress: null,    // set by childEarner after derivation
+    walletDrained: false,   // true once EOL drain has run
+    earningChannels: [],    // tracks which channels are active
     // survival instinct
     survivalMode:               false,
     priceMultiplier:            1.0,

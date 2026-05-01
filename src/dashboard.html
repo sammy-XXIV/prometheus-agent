@@ -422,6 +422,10 @@ html, body {
   <div class="tt-row">SPEC      <span class="v" id="tt-spec">-</span></div>
   <div class="tt-row">DESP      <span class="v" id="tt-desp">-</span></div>
   <div class="tt-row">WTL       <span class="v" id="tt-wtl">-</span></div>
+  <div class="tt-row">CLAW      <span class="v" id="tt-claw">-</span></div>
+  <div class="tt-row" style="font-size:5px;margin-top:4px;border-top:1px solid #003322;padding-top:4px">
+    WALLET <span class="v" id="tt-wallet" style="font-size:5px;word-break:break-all">-</span>
+  </div>
 </div>
 
 <script>
@@ -785,6 +789,8 @@ function attachTip(el, child) {
     document.getElementById('tt-spec').textContent  = d.genome?.specialization || '?'
     document.getElementById('tt-desp').textContent  = (d.desperationLevel || 0) + '/10'
     document.getElementById('tt-wtl').textContent   = (d.willToLive || 0).toFixed(4)
+    document.getElementById('tt-claw').textContent  = d.hasClaw ? '✓ ACTIVE' : '— none'
+    document.getElementById('tt-wallet').textContent = d.walletAddress ? d.walletAddress.slice(0,18) + '…' : 'deriving…'
     tip.classList.add('show')
   })
   el.addEventListener('mouseleave', () => {

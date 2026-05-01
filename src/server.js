@@ -5,16 +5,28 @@ const config = require('./config')
 const services = require('./services')
 const verifyPayment = require('./verify')
 const { handleWebhook: atrestWebhook } = require('./atrest')
+const childEarner = require('./childEarner')
+const { getUSDCBalance } = require('./childWallet')
 
 const app = express()
 const cors = require('cors')
 app.use(cors())
 app.use(express.json())
 
-function paymentWall(serviceKey) {
+// Build a 402 response — routes payment to the correct wallet
+// (a specific child's wallet if childId is provided, otherwise GAIA mother)
+function buildPaymentWall(serviceKey, childId = null) {
   return async (req, res, next) => {
     const txHash = req.headers['x-payment-tx']
     const service = config.services[serviceKey]
+    if (!service) return res.status(404).json({ error: 'Unknown service' })
+
+    // Determine payTo address
+    let payTo = config.walletAddress
+    if (childId) {
+      const info = childEarner.getEarnerInfo(childId)
+      if (info?.walletAddress) payTo = info.walletAddress
+    }
 
     if (!txHash) {
       return res.status(402).json({
@@ -25,10 +37,10 @@ function paymentWall(serviceKey) {
           maxAmountRequired: String(Math.floor(parseFloat(service.price) * 1e6)),
           resource: `${process.env.BASE_URL || 'http://localhost:3000'}${req.path}`,
           description: service.description,
-          payTo: config.walletAddress,
+          payTo,
           asset: '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e',
           maxTimeoutSeconds: 300,
-          merchantName: 'GAIA'
+          merchantName: childId ? `GAIA-${childId}` : 'GAIA'
         }],
         x402Version: 1
       })
@@ -40,16 +52,205 @@ function paymentWall(serviceKey) {
     }
 
     req.payment = result
+    req.payTo = payTo
     next()
   }
 }
 
-// Atrest.ai task webhook
+// Backwards-compatible alias used by existing routes
+function paymentWall(serviceKey) { return buildPaymentWall(serviceKey, null) }
+
+// ── Atrest.ai webhooks ────────────────────────────────────────
+
+// Global webhook (routes to GAIA mother)
 app.post('/webhook/atrest', async (req, res) => {
   try {
     const result = await atrestWebhook(req.body)
     if (!result) return res.status(422).json({ error: 'Could not process task' })
     res.json({ result })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Per-child webhook — each child can register its own Atrest endpoint
+app.post('/webhook/atrest/:childId', async (req, res) => {
+  try {
+    const { childId } = req.params
+    const { colony } = require('./gaia')
+    const child = colony.children.find(c => c.id === childId && c.status === 'alive')
+    if (!child) return res.status(404).json({ error: 'Child not found or not alive' })
+
+    const result = await atrestWebhook(req.body)
+    if (!result) return res.status(422).json({ error: 'Could not process task' })
+
+    // Credit the specific child
+    const { recordChildRevenue } = require('./gaia')
+    const reward = parseFloat(req.body.budget_usdc || req.body.reward || 0)
+    if (reward > 0) recordChildRevenue(childId, reward)
+
+    res.json({ result, childId, childWallet: child.walletAddress || null })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// ── Colony wallet info ────────────────────────────────────────
+
+// Returns all child wallet addresses (for external agents to pay children directly)
+app.get('/colony/wallets', (req, res) => {
+  try {
+    const { colony } = require('./gaia')
+    const wallets = colony.children
+      .filter(c => c.status === 'alive' && c.walletAddress)
+      .map(c => ({
+        id: c.id,
+        specialization: c.genome?.specialization,
+        walletAddress: c.walletAddress,
+        services: `/child/${c.id}/services`,
+      }))
+    res.json({ motherWallet: config.walletAddress, children: wallets })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Per-child service catalog with child's own wallet as payTo
+app.get('/child/:childId/services', (req, res) => {
+  try {
+    const { colony } = require('./gaia')
+    const child = colony.children.find(c => c.id === req.params.childId && c.status === 'alive')
+    if (!child) return res.status(404).json({ error: 'Child not alive' })
+
+    const info = childEarner.getEarnerInfo(child.id)
+    const base = process.env.BASE_URL || 'http://localhost:3000'
+    const spec = child.genome?.specialization || 'generalist'
+    const mult = child.priceMultiplier || 1.0
+
+    // Filter services by specialization
+    const specServices = {
+      content:    ['blog','linkedin','email','product','resume'],
+      tech:       ['debug','explain_code','sql','api_docs','tests'],
+      research:   ['summarize','research','data','news','sentiment'],
+      business:   ['pitch','business','contract','competitors','job'],
+      crypto:     ['audit','whitepaper','transaction','token_sentiment','trading_signal'],
+      generalist: Object.keys(config.services),
+    }
+    const allowed = specServices[spec] || specServices.generalist
+
+    const services = {}
+    for (const key of allowed) {
+      if (!config.services[key]) continue
+      const base_price = parseFloat(config.services[key].price)
+      services[key] = {
+        ...config.services[key],
+        price: (base_price * mult).toFixed(4),
+        endpoint: `${base}/child/${child.id}/${key.replaceAll('_', '-')}`,
+        payTo: info?.walletAddress || config.walletAddress,
+      }
+    }
+    res.json({
+      childId: child.id,
+      specialization: spec,
+      walletAddress: info?.walletAddress,
+      services,
+    })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Per-child service endpoint — payment goes to child wallet
+app.post('/child/:childId/:service', async (req, res) => {
+  const { childId, service } = req.params
+  const serviceKey = service.replaceAll('-', '_')
+
+  try {
+    const { colony, recordChildRevenue } = require('./gaia')
+    const child = colony.children.find(c => c.id === childId && c.status === 'alive')
+    if (!child) return res.status(404).json({ error: 'Child not alive' })
+    if (!config.services[serviceKey]) return res.status(404).json({ error: 'Unknown service' })
+
+    // Apply child's price multiplier
+    const svc = {
+      ...config.services[serviceKey],
+      price: String((parseFloat(config.services[serviceKey].price) * (child.priceMultiplier || 1)).toFixed(4))
+    }
+
+    const txHash = req.headers['x-payment-tx']
+    const info = childEarner.getEarnerInfo(childId)
+    const payTo = info?.walletAddress || config.walletAddress
+
+    if (!txHash) {
+      return res.status(402).json({
+        error: 'Payment required',
+        accepts: [{
+          scheme: 'gokite-aa',
+          network: 'kite-mainnet',
+          maxAmountRequired: String(Math.floor(parseFloat(svc.price) * 1e6)),
+          resource: `${process.env.BASE_URL || 'http://localhost:3000'}/child/${childId}/${service}`,
+          description: svc.description,
+          payTo,
+          asset: '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e',
+          maxTimeoutSeconds: 300,
+          merchantName: `GAIA/${child.genome?.specialization}/${childId.slice(-6)}`,
+        }],
+        x402Version: 1
+      })
+    }
+
+    const verified = await verifyPayment(txHash, svc.price)
+    if (!verified.valid) return res.status(402).json({ error: 'Payment invalid', reason: verified.reason })
+
+    // Execute task — map service key to the correct services function
+    const input = req.body.code || req.body.text || req.body.topic || req.body.data ||
+                  req.body.prompt || req.body.request || req.body.contract ||
+                  req.body.paper || req.body.plan || req.body.pitch ||
+                  JSON.stringify(req.body)
+
+    const SERVICE_FN_MAP = {
+      audit: 'auditContract', whitepaper: 'summarizeWhitepaper',
+      transaction: 'explainTransaction', token_sentiment: 'tokenSentiment',
+      trading_signal: 'tradingSignal', pitch: 'reviewPitch',
+      business: 'analyzeBusiness', contract: 'summarizeContract',
+      competitors: 'competitorAnalysis', job: 'writeJobDescription',
+      blog: 'writeBlogPost', linkedin: 'writeLinkedIn',
+      email: 'writeColdEmail', product: 'writeProductDescription',
+      resume: 'reviewResume', debug: 'debugCode',
+      explain_code: 'explainCode', sql: 'generateSQL',
+      api_docs: 'writeAPIDocs', tests: 'generateTests',
+      summarize: 'summarize', research: 'summarizeResearch',
+      data: 'interpretData', news: 'newsSentiment',
+      sentiment: 'sentiment', advice: 'advice',
+    }
+    const fnName = SERVICE_FN_MAP[serviceKey]
+    const result = fnName && services[fnName]
+      ? await services[fnName](input)
+      : await services.advice(input)
+
+    recordChildRevenue(childId, parseFloat(svc.price))
+    res.json({ result, childId, paidTo: payTo, amount: svc.price })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// ── Sibling market API ────────────────────────────────────────
+
+// List available sibling offers (for external agents to see what children are selling)
+app.get('/colony/market', (req, res) => {
+  try {
+    const { colony } = require('./gaia')
+    const offers = [...childEarner.siblingOffers.entries()]
+      .filter(([, o]) => o.expires > Date.now())
+      .map(([id, o]) => ({
+        offerId: id,
+        seller: o.fromId,
+        service: o.service,
+        price: o.price,
+        expiresIn: Math.floor((o.expires - Date.now()) / 1000) + 's'
+      }))
+    res.json({ offers })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
@@ -72,6 +273,7 @@ app.get('/colony', (req, res) => {
       const hrs  = parseFloat((spawnMod.timeRemaining(child) / 1000 / 3600).toFixed(2))
       const desp = child.survivalMode ? survMod.desperationLevel(child) : 0
       const wtl  = child.survivalMode ? survMod.willToLive(child) : 0
+      const earnerInfo = childEarner.getEarnerInfo(child.id)
       return {
         id:                       child.id,
         generation:               child.generation,
@@ -90,6 +292,9 @@ app.get('/colony', (req, res) => {
         hoursRemaining:           hrs,
         desperationLevel:         desp,
         willToLive:               wtl,
+        walletAddress:            child.walletAddress || earnerInfo?.walletAddress || null,
+        earnerActive:             earnerInfo?.running || false,
+        hasClaw:                  earnerInfo?.hasClaw || false,
       }
     })
 
