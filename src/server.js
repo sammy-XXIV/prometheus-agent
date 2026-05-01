@@ -256,6 +256,20 @@ app.get('/colony/market', (req, res) => {
   }
 })
 
+// Fossil graveyard — permanent record of all deceased children
+app.get('/colony/fossils', (req, res) => {
+  try {
+    const fossils = require('./fossils')
+    const { gen, spec } = req.query
+    let records = fossils.getAll()
+    if (gen)  records = records.filter(f => f.generation === parseInt(gen))
+    if (spec) records = records.filter(f => f.genome?.specialization === spec)
+    res.json({ count: records.length, stats: fossils.getStats(), fossils: records })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // Dashboard
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, '../src/dashboard.html'))
@@ -295,6 +309,8 @@ app.get('/colony', (req, res) => {
         walletAddress:            child.walletAddress || earnerInfo?.walletAddress || null,
         earnerActive:             earnerInfo?.running || false,
         hasClaw:                  earnerInfo?.hasClaw || false,
+        kiteAgentId:              child.kiteAgentId || null,
+        kiteSessionStatus:        child.kiteSessionStatus || null,
       }
     })
 

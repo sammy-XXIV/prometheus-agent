@@ -4,6 +4,8 @@ const { spawnChild, fitness, timeRemaining, shouldTerminate, shouldReproduce } =
 const { runSurvivalInstinct, desperationLevel, willToLive, isSurvivalMode, survivalLabel } = require('./survival')
 const childEarner  = require('./childEarner')
 const { fundChild, drainToMother, deriveChildWallet } = require('./childWallet')
+const registry     = require('./registry')
+const fossils      = require('./fossils')
 
 const MAX_COLONY_SIZE = 12
 const FUND_REQUEST_COOLDOWN = 10 * 60 * 1000  // process fund requests every 10 min
@@ -77,6 +79,14 @@ function startEarner(child) {
     // Back-fill walletAddress on the child object from the earner
     const info = childEarner.getEarnerInfo(child.id)
     if (info) child.walletAddress = info.walletAddress
+
+    // Register Kite Passport identity (non-blocking)
+    registry.registerAgent(child).then(rec => {
+      if (rec?.kiteAgentId) {
+        child.kiteAgentId = rec.kiteAgentId
+        child.kiteSessionStatus = rec.sessionStatus
+      }
+    }).catch(() => {})
   })
 }
 
@@ -94,6 +104,12 @@ function spawnInitialChildren(count = 3) {
 async function drainChild(child) {
   if (child.walletDrained) return
   child.walletDrained = true
+
+  // Fossil record + registry mark-deceased BEFORE wallet drain
+  const identity = registry.getIdentity(child.id)
+  fossils.bury(child, identity?.kiteAgentId || null, null)
+  registry.markDeceased(child.id)
+
   const returned = await drainToMother(child.id)
   if (returned > 0) {
     colony.totalEarned += returned

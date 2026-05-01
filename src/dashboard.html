@@ -426,6 +426,9 @@ html, body {
   <div class="tt-row" style="font-size:5px;margin-top:4px;border-top:1px solid #003322;padding-top:4px">
     WALLET <span class="v" id="tt-wallet" style="font-size:5px;word-break:break-all">-</span>
   </div>
+  <div class="tt-row" style="font-size:5px;margin-top:2px">
+    KITE   <span class="v" id="tt-kite" style="font-size:5px;word-break:break-all">-</span>
+  </div>
 </div>
 
 <script>
@@ -791,6 +794,7 @@ function attachTip(el, child) {
     document.getElementById('tt-wtl').textContent   = (d.willToLive || 0).toFixed(4)
     document.getElementById('tt-claw').textContent  = d.hasClaw ? '✓ ACTIVE' : '— none'
     document.getElementById('tt-wallet').textContent = d.walletAddress ? d.walletAddress.slice(0,18) + '…' : 'deriving…'
+    document.getElementById('tt-kite').textContent   = d.kiteAgentId || 'pending…'
     tip.classList.add('show')
   })
   el.addEventListener('mouseleave', () => {
