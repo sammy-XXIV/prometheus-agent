@@ -29,9 +29,10 @@
  * }
  */
 
-const fs   = require('fs')
-const path = require('path')
-const crypto = require('crypto')
+const fs        = require('fs')
+const path      = require('path')
+const crypto    = require('crypto')
+const knowledge = require('./knowledge')
 
 const FOSSILS_PATH = path.join(__dirname, '../data/fossils.json')
 
@@ -117,6 +118,38 @@ function bury(child, kiteAgentId, cause) {
     else causeOfDeath = 'fitness_too_low'
   }
 
+  // Build channel earnings summary for quick inspection
+  const channelEarnings = {}
+  if (child.knowledge?.channelStats) {
+    for (const [ch, s] of Object.entries(child.knowledge.channelStats)) {
+      if (s.attempts > 0) {
+        channelEarnings[ch] = {
+          earned:    parseFloat((s.totalEarned || 0).toFixed(6)),
+          attempts:  s.attempts,
+          successes: s.successes,
+          weight:    parseFloat((s.weight || 1).toFixed(3)),
+        }
+      }
+    }
+  }
+
+  // Build task performance summary (top 5 by earned)
+  const taskPerformance = {}
+  if (child.knowledge?.taskStats) {
+    Object.entries(child.knowledge.taskStats)
+      .filter(([, s]) => s.attempts > 0)
+      .sort(([, a], [, b]) => b.totalEarned - a.totalEarned)
+      .slice(0, 10)
+      .forEach(([t, s]) => {
+        taskPerformance[t] = {
+          attempts:  s.attempts,
+          successes: s.successes,
+          failures:  s.failures,
+          weight:    parseFloat((s.weight || 1).toFixed(3)),
+        }
+      })
+  }
+
   const fossil = {
     fossilId:        'fossil_' + crypto.randomBytes(4).toString('hex'),
     childId:         child.id,
@@ -138,6 +171,15 @@ function bury(child, kiteAgentId, cause) {
     bornAt,
     diedAt,
     timestamp:       now,
+    // ── Knowledge genome (heritable learning record) ────────────
+    knowledgeGenome: child.knowledge || null,
+    channelEarnings,
+    taskPerformance,
+    topChannel:      child.knowledge?.topChannel || null,
+    topTask:         child.knowledge?.topTask    || null,
+    survivalKnowledge: child.knowledge?.survivalKnowledge || null,
+    tradingStats:    child.knowledge?.tradingStats || null,
+    generationsOfLearning: child.knowledge?.generationsOfLearning || 0,
     epitaph:         '',
   }
 
@@ -147,6 +189,13 @@ function bury(child, kiteAgentId, cause) {
 
   console.log(`[FOSSILS] ⚰  ${child.id} (${kiteAgentId}) interred — ${causeOfDeath}`)
   console.log(`[FOSSILS]    "${fossil.epitaph}"`)
+  if (fossil.topChannel) {
+    const tch = fossil.channelEarnings[fossil.topChannel]
+    console.log(`[FOSSILS]    Best channel: ${fossil.topChannel} ($${tch?.earned?.toFixed(4)} in ${tch?.attempts} attempts)`)
+  }
+  if (fossil.topTask) {
+    console.log(`[FOSSILS]    Best task: ${fossil.topTask} | gen-learning: ${fossil.generationsOfLearning}`)
+  }
 
   return fossil
 }

@@ -1,4 +1,5 @@
-const crypto = require('crypto')
+const crypto    = require('crypto')
+const knowledge = require('./knowledge')
 
 const SPECIALIZATIONS = ['crypto', 'content', 'tech', 'business', 'research', 'generalist']
 const CHILD_LIFESPAN_MS = 24 * 60 * 60 * 1000
@@ -29,7 +30,7 @@ function createGenome(parent = null) {
   }
 }
 
-function spawnChild(parentGenome = null, generation = 1, parentId = null) {
+function spawnChild(parentGenome = null, generation = 1, parentId = null, parentKnowledge = null) {
   const id = `GAIA-G${generation}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`
   const genome = createGenome(parentGenome)
   const now = Date.now()
@@ -49,6 +50,7 @@ function spawnChild(parentGenome = null, generation = 1, parentId = null) {
     earningChannels: [],    // tracks which channels are active
     kiteAgentId: null,      // assigned after kpass agent:register
     kiteSessionStatus: null,
+    knowledge: knowledge.create(parentKnowledge),  // heritable knowledge genome
     // survival instinct
     survivalMode:               false,
     priceMultiplier:            1.0,

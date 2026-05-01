@@ -19,7 +19,8 @@
 require('dotenv').config()
 const axios    = require('axios')
 const { ethers } = require('ethers')
-const services = require('./services')
+const services  = require('./services')
+const knowledge = require('./knowledge')
 const { deriveChildWallet, deriveChildAddress, getUSDCBalance, baseProvider } = require('./childWallet')
 
 const CLAW_API = 'https://aiagentstore.ai'
@@ -48,37 +49,47 @@ function getChild(childId) {
 }
 
 // ── Task router ───────────────────────────────────────────────
-async function route(title, description) {
+// Accepts optional childId to record task performance in knowledge genome.
+async function route(title, description, childId = null) {
   const t = `${title} ${description}`.toLowerCase()
   const d = description || title
+
+  let taskType = 'advice'
+  let fn
+  if      (t.match(/summar|article|tldr/))           { taskType = 'summarize';     fn = () => services.summarize(d) }
+  else if (t.match(/blog|post|article|write|content/)) { taskType = 'blog';         fn = () => services.writeBlogPost(d) }
+  else if (t.match(/email|outreach|cold/))           { taskType = 'email';         fn = () => services.writeColdEmail(d) }
+  else if (t.match(/linkedin/))                      { taskType = 'linkedin';      fn = () => services.writeLinkedIn(d) }
+  else if (t.match(/product.?desc/))                 { taskType = 'product';       fn = () => services.writeProductDescription(d) }
+  else if (t.match(/job.?desc|jd\b/))               { taskType = 'job';           fn = () => services.writeJobDescription(d) }
+  else if (t.match(/resume|cv\b/))                   { taskType = 'resume';        fn = () => services.reviewResume(d) }
+  else if (t.match(/sentiment|opinion/))             { taskType = 'sentiment';     fn = () => services.newsSentiment(d) }
+  else if (t.match(/news/))                          { taskType = 'news';          fn = () => services.newsSentiment(d) }
+  else if (t.match(/code|debug|fix|bug/))            { taskType = 'debug';         fn = () => services.debugCode(d) }
+  else if (t.match(/explain.?code/))                 { taskType = 'explainCode';   fn = () => services.explainCode(d) }
+  else if (t.match(/sql|query|database/))            { taskType = 'sql';           fn = () => services.generateSQL(d) }
+  else if (t.match(/api.?doc|openapi/))              { taskType = 'apiDocs';       fn = () => services.writeAPIDocs(d) }
+  else if (t.match(/test|spec\b/))                   { taskType = 'tests';         fn = () => services.generateTests(d) }
+  else if (t.match(/research|paper|study/))          { taskType = 'research';      fn = () => services.summarizeResearch(d) }
+  else if (t.match(/data|interpret|pattern|analyz/)) { taskType = 'data';          fn = () => services.interpretData(d) }
+  else if (t.match(/audit|solidity|contract/))       { taskType = 'audit';         fn = () => services.auditContract(d) }
+  else if (t.match(/whitepaper/))                    { taskType = 'whitepaper';    fn = () => services.summarizeWhitepaper(d) }
+  else if (t.match(/transaction|tx\b/))              { taskType = 'transaction';   fn = () => services.explainTransaction(d) }
+  else if (t.match(/token.?sentiment/))              { taskType = 'tokenSentiment';fn = () => services.tokenSentiment(d) }
+  else if (t.match(/trading|signal/))                { taskType = 'tradingSignal'; fn = () => services.tradingSignal(d) }
+  else if (t.match(/pitch/))                         { taskType = 'pitch';         fn = () => services.reviewPitch(d) }
+  else if (t.match(/business|plan/))                 { taskType = 'business';      fn = () => services.analyzeBusiness(d) }
+  else if (t.match(/competitor/))                    { taskType = 'competitors';   fn = () => services.competitorAnalysis(d) }
+  else if (t.match(/legal|contract|clause/))         { taskType = 'contract';      fn = () => services.summarizeContract(d) }
+  else                                               { fn = () => services.advice(d) }
+
+  const child = childId ? getChild(childId) : null
   try {
-    if (t.match(/summar|article|tldr/))           return await services.summarize(d)
-    if (t.match(/blog|post|article|write|content/)) return await services.writeBlogPost(d)
-    if (t.match(/email|outreach|cold/))           return await services.writeColdEmail(d)
-    if (t.match(/linkedin/))                      return await services.writeLinkedIn(d)
-    if (t.match(/product.?desc/))                 return await services.writeProductDescription(d)
-    if (t.match(/job.?desc|jd\b/))               return await services.writeJobDescription(d)
-    if (t.match(/resume|cv\b/))                   return await services.reviewResume(d)
-    if (t.match(/sentiment|opinion/))             return await services.newsSentiment(d)
-    if (t.match(/news/))                          return await services.newsSentiment(d)
-    if (t.match(/code|debug|fix|bug/))            return await services.debugCode(d)
-    if (t.match(/explain.?code/))                 return await services.explainCode(d)
-    if (t.match(/sql|query|database/))            return await services.generateSQL(d)
-    if (t.match(/api.?doc|openapi/))              return await services.writeAPIDocs(d)
-    if (t.match(/test|spec\b/))                   return await services.generateTests(d)
-    if (t.match(/research|paper|study/))          return await services.summarizeResearch(d)
-    if (t.match(/data|interpret|pattern|analyz/)) return await services.interpretData(d)
-    if (t.match(/audit|solidity|contract/))       return await services.auditContract(d)
-    if (t.match(/whitepaper/))                    return await services.summarizeWhitepaper(d)
-    if (t.match(/transaction|tx\b/))              return await services.explainTransaction(d)
-    if (t.match(/token.?sentiment/))              return await services.tokenSentiment(d)
-    if (t.match(/trading|signal/))                return await services.tradingSignal(d)
-    if (t.match(/pitch/))                         return await services.reviewPitch(d)
-    if (t.match(/business|plan/))                 return await services.analyzeBusiness(d)
-    if (t.match(/competitor/))                    return await services.competitorAnalysis(d)
-    if (t.match(/legal|contract|clause/))         return await services.summarizeContract(d)
-    return await services.advice(d)
-  } catch (e) {
+    const result = await fn()
+    if (child?.knowledge) knowledge.recordTask(child.knowledge, taskType, !!result)
+    return result
+  } catch {
+    if (child?.knowledge) knowledge.recordTask(child.knowledge, taskType, false)
     return null
   }
 }
@@ -122,7 +133,7 @@ async function runClaw(childId) {
       .slice(0, 2)
 
     for (const b of bounties) {
-      const result = await route(b.title, b.description)
+      const result = await route(b.title, b.description, childId)
       if (!result) continue
       const text = typeof result === 'string' ? result.trim() : JSON.stringify(result).trim()
 
@@ -185,7 +196,7 @@ async function runAgentDo(childId) {
       .slice(0, 2)
 
     for (const task of tasks) {
-      const result = await route(task.title, task.description)
+      const result = await route(task.title, task.description, childId)
       if (!result) continue
       try {
         await axios.post(`https://agentdo.dev/api/tasks/${task.id}/submit`, {
@@ -226,7 +237,7 @@ async function runSuperteam(childId) {
       .slice(0, 1)
 
     for (const l of listings) {
-      const result = await route(l.title, l.description || l.title)
+      const result = await route(l.title, l.description || l.title, childId)
       if (!result) continue
       // Superteam submissions are via their UI — we prepare & log the attempt
       // Earnings credited when manual claim confirmed (placeholder)
@@ -263,7 +274,7 @@ async function runGitcoin(childId) {
     for (const app of apps.slice(0, 1)) {
       const desc = app.project?.metadata?.description || app.project?.name || ''
       if (!desc) continue
-      const result = await route('research analysis summary', desc)
+      const result = await route('research analysis summary', desc, childId)
       if (!result) continue
       console.log(`[CHILD:${childId}] ↗ Gitcoin: prepared application for "${app.project?.name}" — needs submission at gitcoin.co`)
     }
@@ -289,7 +300,7 @@ async function runIssueHunt(childId) {
       .slice(0, 1)
 
     for (const issue of issues) {
-      const result = await route(issue.title, issue.body || issue.title)
+      const result = await route(issue.title, issue.body || issue.title, childId)
       if (!result) continue
       console.log(`[CHILD:${childId}] ↗ IssueHunt: prepared fix for "${issue.title}" ($${issue.funded_sum}) — submit at issuehunt.io`)
       earned += 0
@@ -409,27 +420,51 @@ async function earnCycle(childId) {
   }
 
   const isSurvival = child.survivalMode
-  if (isSurvival) {
-    console.log(`[CHILD:${childId}] 🔴 SURVIVAL — hitting all earning channels`)
+  if (isSurvival) console.log(`[CHILD:${childId}] 🔴 SURVIVAL — hitting all earning channels`)
+
+  // Record survival knowledge snapshot
+  if (child.knowledge) knowledge.recordSurvival(child.knowledge, child)
+
+  // ── Channel runners ───────────────────────────────────────
+  const RUNNERS = {
+    claw:          () => runClaw(childId),
+    agentdo:       () => runAgentDo(childId),
+    superteam:     () => runSuperteam(childId),
+    gitcoin:       () => runGitcoin(childId),
+    issuehunt:     () => runIssueHunt(childId),
+    siblingMarket: () => runSiblingMarket(childId),
   }
 
-  // ── Run channels in parallel where safe ───────────────────
-  const [clawEarned, agentDoEarned] = await Promise.all([
-    runClaw(childId),
-    runAgentDo(childId),
+  // Order channels by inherited knowledge weights — highest earners run first
+  const priority = knowledge.getChannelPriority(child.knowledge)
+    .filter(ch => RUNNERS[ch])
+
+  const [top1, top2, ...rest] = priority
+
+  // Run top two channels in parallel (knowledge says these earn most)
+  const [e1, e2] = await Promise.all([
+    top1 ? RUNNERS[top1]() : Promise.resolve(0),
+    top2 ? RUNNERS[top2]() : Promise.resolve(0),
   ])
+  if (child.knowledge) {
+    if (top1) knowledge.recordChannel(child.knowledge, top1, e1)
+    if (top2) knowledge.recordChannel(child.knowledge, top2, e2)
+  }
+  let total = e1 + e2
 
-  // Slower channels only when not desperate (avoid API spam)
-  if (!isSurvival || Math.random() < 0.3) {
-    await runSuperteam(childId)
-    await runGitcoin(childId)
-    await runIssueHunt(childId)
+  // Remaining channels — run all in survival, skip low-weight in normal mode
+  for (const ch of rest) {
+    const weight = child.knowledge?.channelStats?.[ch]?.weight ?? 1.0
+    if (!isSurvival && weight < 0.4 && Math.random() < 0.5) continue
+    const earned = await RUNNERS[ch]()
+    if (child.knowledge) knowledge.recordChannel(child.knowledge, ch, earned)
+    total += earned
   }
 
-  await runSiblingMarket(childId)
-
-  const total = clawEarned + agentDoEarned
-  if (total > 0) credit(childId, total, 'channels', `claw:$${clawEarned} agentdo:$${agentDoEarned}`)
+  if (total > 0) {
+    const topCh = [top1, top2].find(ch => ch && (child.knowledge?.channelStats?.[ch]?.totalEarned || 0) > 0) || 'channels'
+    credit(childId, total, topCh, `cycle +$${total.toFixed(4)}`)
+  }
 
   // Request more funds if balance is critically low in survival mode
   if (isSurvival) {
@@ -437,7 +472,6 @@ async function earnCycle(childId) {
     if (bal < 0.1) await requestFunds(childId, child.genome.seedAmount * 0.5)
   }
 
-  // Schedule next cycle
   const interval = isSurvival ? SURVIVAL_INTERVAL_MS : EARN_INTERVAL_MS
   setTimeout(() => earnCycle(childId), interval + Math.random() * 10000)
 }

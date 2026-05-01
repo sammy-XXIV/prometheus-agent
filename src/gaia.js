@@ -6,6 +6,7 @@ const childEarner  = require('./childEarner')
 const { fundChild, drainToMother, deriveChildWallet } = require('./childWallet')
 const registry     = require('./registry')
 const fossils      = require('./fossils')
+const knowledge    = require('./knowledge')
 
 const MAX_COLONY_SIZE = 12
 const FUND_REQUEST_COOLDOWN = 10 * 60 * 1000  // process fund requests every 10 min
@@ -105,6 +106,12 @@ async function drainChild(child) {
   if (child.walletDrained) return
   child.walletDrained = true
 
+  // Finalize knowledge genome — computes final weights and top channel/task
+  if (child.knowledge) {
+    knowledge.finalize(child.knowledge, child)
+    console.log(`[GENOME] ${child.id} — ${knowledge.summary(child.knowledge)}`)
+  }
+
   // Fossil record + registry mark-deceased BEFORE wallet drain
   const identity = registry.getIdentity(child.id)
   fossils.bury(child, identity?.kiteAgentId || null, null)
@@ -170,10 +177,11 @@ async function runColonyCycle() {
       colony.generation = Math.max(colony.generation, child.generation + 1)
       const aliveNow = colony.children.filter(c => c.status === 'alive').length
       if (aliveNow < MAX_COLONY_SIZE) {
-        const offspring = spawnChild(child.genome, child.generation + 1, child.id)
+        const offspring = spawnChild(child.genome, child.generation + 1, child.id, child.knowledge)
         colony.children.push(offspring)
         startEarner(offspring)
-        console.log(`[EVOLUTION] ${child.id} reproduced -> ${offspring.id}`)
+        const knSummary = knowledge.summary(offspring.knowledge)
+        console.log(`[EVOLUTION] ${child.id} reproduced -> ${offspring.id} | ${knSummary}`)
         colonyEvent(`${child.id.replace('GAIA-','')} reproduced -> ${offspring.id.replace('GAIA-','')} (Gen ${offspring.generation})`, 'success')
       } else {
         console.log(`[EVOLUTION] ${child.id} reproduced but colony full (${aliveNow}/${MAX_COLONY_SIZE})`)
