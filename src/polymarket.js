@@ -45,7 +45,7 @@ const MAX_BET          = 0.50
 const KELLY_FRACTION   = 0.02
 const MAX_EXPOSURE     = 0.20
 const MIN_EDGE         = 0.15
-const CHILD_POLY_SEED  = 0.50   // USDC to seed each child's Polygon wallet
+const CHILD_POLY_SEED  = 1.00   // USDC to seed each child's Polygon wallet
 const CHILD_MATIC_SEED = '0.05' // MATIC for gas
 const MAX_MARKETS      = 8
 const SCAN_MS          = 60 * 60 * 1000
@@ -768,4 +768,14 @@ function start(colony, onEarning) {
 
 function getPositions() { return { ...positions } }
 
-module.exports = { start, runForChild, getPositions, getCategory }
+// Eagerly seed a newly-spawned child on Polygon.
+// Called from gaia.js right after the child wallet address is known.
+async function seedChild(child) {
+  if (!child?.walletAddress) return
+  if (fundedChildren.has(child.id)) return
+  const mother = motherPolyWallet()
+  if (!mother) return  // no signing key — silent skip
+  await fundChildPoly(child.id, child.walletAddress)
+}
+
+module.exports = { start, runForChild, seedChild, getPositions, getCategory }

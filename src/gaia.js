@@ -88,6 +88,10 @@ function startEarner(child) {
         child.kiteSessionStatus = rec.sessionStatus
       }
     }).catch(() => {})
+
+    // Eagerly seed child's Polygon wallet for Polymarket betting
+    const polymarket = require('./polymarket')
+    polymarket.seedChild(child).catch(() => {})
   })
 }
 
