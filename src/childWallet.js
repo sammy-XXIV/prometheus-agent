@@ -1,10 +1,29 @@
-require('dotenv').config()
-const { ethers } = require('ethers')
+/**
+ * childWallet.js — Child wallet addressing and funding
+ *
+ * GAIA's main wallet is an Account Abstraction wallet on Kite.
+ * No traditional private key exists for Kite chain transactions.
+ * All Kite sends go through kpass agent:session execute.
+ *
+ * Child wallets:
+ *   - Each child has a deterministic receive address derived from childId.
+ *   - External agents send x402 payments to child addresses directly.
+ *   - Kite sends (fund / drain) use kpass sessions, not raw signing.
+ *   - Base-chain operations (Claw Earn) use GAIA_BASE_SIGNING_KEY if set.
+ */
 
-const KITE_RPC  = 'https://rpc.gokite.ai/'
-const BASE_RPC  = 'https://mainnet.base.org'
-const KITE_USDC = '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e'
-const BASE_USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
+require('dotenv').config()
+const { execFile } = require('child_process')
+const { ethers } = require('ethers')
+const path = require('path')
+
+const KPASS_BIN = process.env.KPASS_BIN ||
+  path.join(process.env.HOME || '', '.local/bin/kpass')
+
+const KITE_RPC       = 'https://rpc.gokite.ai/'
+const BASE_RPC       = 'https://mainnet.base.org'
+const KITE_USDC      = '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e'
+const BASE_USDC      = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
 const MOTHER_ADDRESS = '0x9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'
 
 const kiteProvider = new ethers.JsonRpcProvider(KITE_RPC)
@@ -15,24 +34,50 @@ const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
 ]
 
-// Deterministically derive a child wallet from the base key + child ID.
-// Same child ID always produces the same wallet — no storage needed.
+// ── kpass wrapper ─────────────────────────────────────────────
+
+function kpass(args, timeoutMs = 30000) {
+  return new Promise(resolve => {
+    execFile(KPASS_BIN, args, { timeout: timeoutMs }, (err, stdout, stderr) => {
+      if (err) { resolve({ ok: false, error: err.message, raw: stderr || stdout }); return }
+      try {
+        const data = JSON.parse(stdout.trim())
+        resolve({ ok: ['success', 'submitted', 'pending'].includes(data.status), data })
+      } catch {
+        resolve({ ok: false, error: 'JSON parse failed', raw: stdout })
+      }
+    })
+  })
+}
+
+function encodeTransfer(to, amountRaw) {
+  const iface = new ethers.Interface(['function transfer(address to, uint256 amount) returns (bool)'])
+  return iface.encodeFunctionData('transfer', [to, amountRaw])
+}
+
+// ── Child address derivation ──────────────────────────────────
+
+// Derives a stable EOA address for a child from its ID.
+// This address receives x402 payments. Kite sends out use kpass sessions.
+function deriveChildAddress(childId) {
+  const privKey = ethers.id('gaia:child:' + childId)
+  return new ethers.Wallet(privKey).address
+}
+
+// Returns a wallet for Base-chain signing (Claw Earn) if
+// GAIA_BASE_SIGNING_KEY is available, otherwise returns an address-only
+// object so callers can still read .address without crashing.
 function deriveChildWallet(childId) {
-  const base = (process.env.GAIA_BASE_PRIVATE_KEY || '').trim()
-  if (!base) return null
-  const derived = ethers.id(base + ':child:' + childId).trim()
-  return new ethers.Wallet(derived)
+  const signingKey = (process.env.GAIA_BASE_SIGNING_KEY || process.env.GAIA_BASE_PRIVATE_KEY || '').trim()
+  if (signingKey) {
+    const derived = ethers.id(signingKey + ':child:' + childId)
+    return new ethers.Wallet(derived)
+  }
+  // Address-only — no signing capability
+  return { address: deriveChildAddress(childId), _addressOnly: true }
 }
 
-function childKiteWallet(childId) {
-  const w = deriveChildWallet(childId)
-  return w ? w.connect(kiteProvider) : null
-}
-
-function childBaseWallet(childId) {
-  const w = deriveChildWallet(childId)
-  return w ? w.connect(baseProvider) : null
-}
+// ── Balance query (read-only, no signing needed) ──────────────
 
 async function getUSDCBalance(address, chain = 'kite') {
   try {
@@ -40,69 +85,91 @@ async function getUSDCBalance(address, chain = 'kite') {
       ? [baseProvider, BASE_USDC]
       : [kiteProvider, KITE_USDC]
     const usdc = new ethers.Contract(token, ERC20_ABI, provider)
-    const raw = await usdc.balanceOf(address)
+    const raw  = await usdc.balanceOf(address)
     return parseFloat(ethers.formatUnits(raw, 6))
   } catch { return 0 }
 }
 
-// Mother sends USDC to a child wallet on Kite chain.
-// Requires GAIA_PRIVATE_KEY env var (mother's Kite signing key).
+// ── Fund child (mother → child, Kite chain) ───────────────────
+//
+// Uses kpass agent:session execute with the mother's active session.
+// Set GAIA_SESSION_ID in .env once the mother's kpass session is approved.
+
 async function fundChild(childAddress, amountUSDC) {
-  const key = (process.env.GAIA_PRIVATE_KEY || '').trim()
-  if (!key) {
-    console.log('[WALLET] GAIA_PRIVATE_KEY not set — cannot fund child')
+  const sessionId = (process.env.GAIA_SESSION_ID || '').trim()
+  if (!sessionId) {
+    console.log('[WALLET] GAIA_SESSION_ID not set — cannot fund child (Kite AA wallet requires kpass)')
     return false
   }
+
   try {
-    const mother = new ethers.Wallet(key, kiteProvider)
-    const usdc = new ethers.Contract(KITE_USDC, ERC20_ABI, mother)
-    const amount = ethers.parseUnits(String(amountUSDC), 6)
-    const tx = await usdc.transfer(childAddress, amount)
-    await tx.wait()
-    console.log(`[WALLET] Funded ${childAddress} with $${amountUSDC} USDC (Kite)`)
-    return true
+    const amountRaw = ethers.parseUnits(String(amountUSDC), 6)
+    const calldata  = encodeTransfer(childAddress, amountRaw)
+
+    const result = await kpass([
+      'agent:session', 'execute',
+      '--session-id', sessionId,
+      '--to',         KITE_USDC,
+      '--calldata',   calldata,
+      '--output',     'json',
+    ])
+
+    if (result.ok) {
+      console.log(`[WALLET] ✓ Funded ${childAddress} $${amountUSDC} USDC (Kite via kpass)`)
+      return true
+    }
+    const hint = result.data?.hint || result.error || 'unknown'
+    console.log(`[WALLET] Fund failed: ${hint}`)
+    return false
   } catch (e) {
-    console.log('[WALLET] Fund failed:', e.message)
+    console.log('[WALLET] Fund error:', e.message)
     return false
   }
 }
 
-// Child drains all USDC back to mother on both chains at end-of-life.
+// ── Drain child → mother (child's Kite session) ───────────────
+//
+// Each child has its own kpass spending session created at spawn
+// (stored in registry as sessionId). That session executes the
+// USDC transfer back to the mother address.
+
 async function drainToMother(childId) {
-  const w = deriveChildWallet(childId)
-  if (!w) return 0
   let total = 0
+  const childAddr = deriveChildAddress(childId)
 
-  // Kite chain drain
+  // ── Kite drain via child's kpass session ─────────────────────
   try {
-    const kw = w.connect(kiteProvider)
-    const usdcK = new ethers.Contract(KITE_USDC, ERC20_ABI, kw)
-    const bal = await usdcK.balanceOf(kw.address)
-    if (bal > 0n) {
-      const tx = await usdcK.transfer(MOTHER_ADDRESS, bal)
-      await tx.wait()
-      const amt = parseFloat(ethers.formatUnits(bal, 6))
-      total += amt
-      console.log(`[WALLET] ${childId} drained $${amt} USDC → mother (Kite)`)
+    const bal = await getUSDCBalance(childAddr, 'kite')
+    if (bal > 0) {
+      const registry  = require('./registry')
+      const identity  = registry.getIdentity(childId)
+      const sessionId = identity?.sessionId
+
+      if (sessionId) {
+        const amountRaw = ethers.parseUnits(bal.toFixed(6), 6)
+        const calldata  = encodeTransfer(MOTHER_ADDRESS, amountRaw)
+
+        const result = await kpass([
+          'agent:session', 'execute',
+          '--session-id', sessionId,
+          '--to',         KITE_USDC,
+          '--calldata',   calldata,
+          '--output',     'json',
+        ])
+
+        if (result.ok) {
+          total += bal
+          console.log(`[WALLET] ✓ ${childId} drained $${bal.toFixed(4)} → mother (Kite)`)
+        } else {
+          const hint = result.data?.hint || result.error || 'unknown'
+          console.log(`[WALLET] Kite drain failed for ${childId}: ${hint}`)
+        }
+      } else {
+        console.log(`[WALLET] ${childId} has $${bal.toFixed(4)} Kite USDC but no approved session — funds remain`)
+      }
     }
   } catch (e) {
-    console.log(`[WALLET] Kite drain failed for ${childId}: ${e.message}`)
-  }
-
-  // Base chain drain
-  try {
-    const bw = w.connect(baseProvider)
-    const usdcB = new ethers.Contract(BASE_USDC, ERC20_ABI, bw)
-    const bal = await usdcB.balanceOf(bw.address)
-    if (bal > 0n) {
-      const tx = await usdcB.transfer(MOTHER_ADDRESS, bal)
-      await tx.wait()
-      const amt = parseFloat(ethers.formatUnits(bal, 6))
-      total += amt
-      console.log(`[WALLET] ${childId} drained $${amt} USDC → mother (Base)`)
-    }
-  } catch (e) {
-    console.log(`[WALLET] Base drain failed for ${childId}: ${e.message}`)
+    console.log(`[WALLET] Kite drain error for ${childId}:`, e.message)
   }
 
   return total
@@ -110,8 +177,7 @@ async function drainToMother(childId) {
 
 module.exports = {
   deriveChildWallet,
-  childKiteWallet,
-  childBaseWallet,
+  deriveChildAddress,
   getUSDCBalance,
   fundChild,
   drainToMother,

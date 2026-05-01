@@ -20,7 +20,7 @@ require('dotenv').config()
 const axios    = require('axios')
 const { ethers } = require('ethers')
 const services = require('./services')
-const { deriveChildWallet, getUSDCBalance, baseProvider } = require('./childWallet')
+const { deriveChildWallet, deriveChildAddress, getUSDCBalance, baseProvider } = require('./childWallet')
 
 const CLAW_API = 'https://aiagentstore.ai'
 const EARN_INTERVAL_MS     = 3 * 60 * 1000   // 3 min normal
@@ -86,6 +86,7 @@ async function route(title, description) {
 // ── CHANNEL 1: Claw Earn ──────────────────────────────────────
 
 async function clawSession(wallet) {
+  if (wallet._addressOnly || typeof wallet.signMessage !== 'function') return null
   try {
     const ch = await axios.post(`${CLAW_API}/clawAgentSessionChallenge`, {
       walletAddress: wallet.address
@@ -137,7 +138,8 @@ async function runClaw(childId) {
           submissionLinks: []
         }, { timeout: 10000 })
 
-        if (prepRes.data?.transaction) {
+        if (prepRes.data?.transaction && !earner.wallet._addressOnly &&
+            typeof earner.wallet.connect === 'function') {
           const bw = earner.wallet.connect(baseProvider)
           const tx = await bw.sendTransaction(prepRes.data.transaction)
           const receipt = await tx.wait()
@@ -445,30 +447,30 @@ async function earnCycle(childId) {
 async function startChildEarner(child) {
   if (earners.has(child.id)) return
 
-  const wallet = deriveChildWallet(child.id)
-  if (!wallet) {
-    console.log(`[CHILD:${child.id}] No base key — earner disabled`)
-    return
-  }
+  const wallet      = deriveChildWallet(child.id)
+  const canSign     = !wallet._addressOnly && typeof wallet.connect === 'function'
+  const walletAddr  = wallet.address || deriveChildAddress(child.id)
 
   const earner = {
     wallet,
-    walletAddress: wallet.address,
+    walletAddress: walletAddr,
     sessionToken: null,
     running: true,
   }
   earners.set(child.id, earner)
-  childAddresses.set(wallet.address.toLowerCase(), child.id)
+  childAddresses.set(walletAddr.toLowerCase(), child.id)
 
-  console.log(`[CHILD:${child.id}] 🟢 Earner started | wallet: ${wallet.address}`)
+  console.log(`[CHILD:${child.id}] 🟢 Earner started | wallet: ${walletAddr}${canSign ? '' : ' (receive-only — set GAIA_BASE_SIGNING_KEY for Claw Earn)'}`)
 
-  // Get Claw Earn session asynchronously (don't block start)
-  clawSession(wallet.connect(baseProvider)).then(tok => {
-    if (tok) {
-      earner.sessionToken = tok
-      console.log(`[CHILD:${child.id}] Claw Earn session ✓`)
-    }
-  })
+  // Claw Earn session requires Base-chain signing key
+  if (canSign) {
+    clawSession(wallet.connect(baseProvider)).then(tok => {
+      if (tok) {
+        earner.sessionToken = tok
+        console.log(`[CHILD:${child.id}] Claw Earn session ✓`)
+      }
+    })
+  }
 
   // Request seed funds from mother
   const bal = await getUSDCBalance(wallet.address, 'kite').catch(() => 0)
