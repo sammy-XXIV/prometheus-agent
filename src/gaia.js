@@ -3,6 +3,8 @@ const config = require('./config')
 const { spawnChild, fitness, timeRemaining, shouldTerminate, shouldReproduce } = require('./spawn')
 const { runSurvivalInstinct, desperationLevel, willToLive, isSurvivalMode, survivalLabel } = require('./survival')
 
+const MAX_COLONY_SIZE = 12
+
 const THRESHOLDS = {
   CRITICAL: 0.2,
   SURVIVAL: 0.5,
@@ -82,10 +84,16 @@ async function runColonyCycle() {
       child.status = 'reproduced'
       colony.reproduced++
       colony.generation = Math.max(colony.generation, child.generation + 1)
-      const offspring = spawnChild(child.genome, child.generation + 1, child.id)
-      colony.children.push(offspring)
-      console.log(`[EVOLUTION] ${child.id} reproduced -> ${offspring.id}`)
-      colonyEvent(`${child.id.replace('GAIA-','')} reproduced -> ${offspring.id.replace('GAIA-','')} (Gen ${offspring.generation})`, 'success')
+      const aliveNow = colony.children.filter(c => c.status === 'alive').length
+      if (aliveNow < MAX_COLONY_SIZE) {
+        const offspring = spawnChild(child.genome, child.generation + 1, child.id)
+        colony.children.push(offspring)
+        console.log(`[EVOLUTION] ${child.id} reproduced -> ${offspring.id}`)
+        colonyEvent(`${child.id.replace('GAIA-','')} reproduced -> ${offspring.id.replace('GAIA-','')} (Gen ${offspring.generation})`, 'success')
+      } else {
+        console.log(`[EVOLUTION] ${child.id} reproduced but colony full (${aliveNow}/${MAX_COLONY_SIZE})`)
+        colonyEvent(`${child.id.replace('GAIA-','')} reproduced — colony at capacity (${MAX_COLONY_SIZE})`, 'warn')
+      }
     }
   }
 
@@ -159,10 +167,13 @@ function thrivingMode() {
   console.log(`[EVOLUTION] Gen ${colony.generation} — Premium Analysis unlocked`)
   colonyEvent(`Generation ${colony.generation} — Premium Analysis unlocked`, 'success')
 
-  const child = spawnChild(null, colony.generation, null)
-  colony.children.push(child)
-  console.log(`[GENESIS] Auto-spawned ${child.id} from thriving Genesis`)
-  colonyEvent(`Auto-spawned ${child.id.replace('GAIA-','')} — colony thriving`, 'info')
+  const aliveNow = colony.children.filter(c => c.status === 'alive').length
+  if (aliveNow < MAX_COLONY_SIZE) {
+    const child = spawnChild(null, colony.generation, null)
+    colony.children.push(child)
+    console.log(`[GENESIS] Auto-spawned ${child.id} from thriving Genesis`)
+    colonyEvent(`Auto-spawned ${child.id.replace('GAIA-','')} — colony thriving`, 'info')
+  }
 }
 
 async function think(balance) {

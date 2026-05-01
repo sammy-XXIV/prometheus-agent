@@ -3,775 +3,954 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GAIA // Colony</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<title>GAIA // COLONY</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0; padding: 0;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
 
 :root {
-  --bg:        #050d1a;
-  --bg2:       #070f20;
-  --gaia-core: #00ff88;
-  --gaia-glow: #00cc66;
-  --teal:      #00e5cc;
-  --amber:     #ffaa00;
-  --red:       #ff3344;
-  --white:     #e8f8ff;
-  --dim:       rgba(0,255,136,0.15);
-  --font-main: 'Orbitron', monospace;
-  --font-mono: 'Share Tech Mono', monospace;
+  --bg: #0a0a1a;
+  --green: #00ee77;
+  --green-dim: rgba(0,238,119,0.4);
+  --green-dark: #003322;
+  --amber: #ffaa00;
+  --red: #ff3344;
+  --blue: #4488ff;
+  --purple: #cc66ff;
+  --white: #ddeeff;
+  --font: 'Press Start 2P', monospace;
 }
 
 html, body {
   width: 100%; height: 100%;
   background: var(--bg);
   color: var(--white);
-  font-family: var(--font-mono);
+  font-family: var(--font);
   overflow: hidden;
 }
 
-/* ── Canvas layer ─────────────────────────────────────────── */
-#cosmos {
+/* pixel grid background */
+#grid-bg {
   position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,238,119,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,238,119,0.04) 1px, transparent 1px);
+  background-size: 16px 16px;
   z-index: 0;
   pointer-events: none;
 }
 
-/* ── Organism scene ───────────────────────────────────────── */
-#scene {
+/* CRT scanline overlay */
+#scanlines {
   position: fixed; inset: 0;
-  z-index: 1;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0,0,0,0.12) 3px,
+    rgba(0,0,0,0.12) 4px
+  );
+  z-index: 100;
   pointer-events: none;
 }
 
-/* ── SVG connections ──────────────────────────────────────── */
-#connections {
+/* creature layer */
+#world {
   position: fixed; inset: 0;
-  z-index: 2;
+  z-index: 5;
   pointer-events: none;
 }
 
-/* ── Organisms ────────────────────────────────────────────── */
-.organism {
+/* GAIA top-center zone */
+#gaia-zone {
   position: absolute;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: all;
-  cursor: pointer;
-  transition: filter 0.6s, box-shadow 0.6s;
-}
-
-/* GAIA mother */
-#gaia-organism {
-  z-index: 10;
-  border-radius: 50%;
-}
-
-.gaia-core {
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 35%,
-    #a0ffcc 0%, #00ff88 30%, #00cc55 60%, #005522 100%);
-  box-shadow:
-    0 0 40px 20px rgba(0,255,136,0.5),
-    0 0 80px 40px rgba(0,255,136,0.25),
-    0 0 160px 80px rgba(0,204,102,0.1);
-  animation: gaiaBreath 4s ease-in-out infinite;
-}
-
-@keyframes gaiaBreath {
-  0%, 100% { transform: scale(1);   box-shadow: 0 0 40px 20px rgba(0,255,136,0.5), 0 0 80px 40px rgba(0,255,136,0.25), 0 0 160px 80px rgba(0,204,102,0.1); }
-  50%       { transform: scale(1.08); box-shadow: 0 0 60px 30px rgba(0,255,136,0.7), 0 0 120px 60px rgba(0,255,136,0.35), 0 0 220px 100px rgba(0,204,102,0.18); }
-}
-
-.gaia-ring {
-  position: absolute; border-radius: 50%;
-  border: 1px solid rgba(0,255,136,0.2);
-  animation: ringPulse 4s ease-in-out infinite;
-  pointer-events: none;
-}
-.gaia-ring:nth-child(1) { animation-delay: 0s; }
-.gaia-ring:nth-child(2) { animation-delay: 1s; }
-.gaia-ring:nth-child(3) { animation-delay: 2s; }
-
-@keyframes ringPulse {
-  0%   { opacity: 0.7; transform: translate(-50%,-50%) scale(1); }
-  100% { opacity: 0;   transform: translate(-50%,-50%) scale(2.5); }
-}
-
-/* Child organisms */
-.child-organism {
-  z-index: 8;
-  border-radius: 50%;
-  animation: childFloat 6s ease-in-out infinite;
-}
-
-@keyframes childFloat {
-  0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
-  50%       { transform: translate(-50%, -50%) translateY(-8px); }
-}
-
-.child-body {
-  width: 100%; height: 100%;
-  border-radius: 50%;
-  position: relative;
-  overflow: hidden;
-}
-
-.child-membrane {
-  position: absolute; inset: 0;
-  border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.4);
-  animation: membranePulse 3s ease-in-out infinite;
-}
-
-@keyframes membranePulse {
-  0%, 100% { transform: scale(1);    opacity: 0.6; }
-  50%       { transform: scale(1.06); opacity: 1; }
-}
-
-.child-nucleus {
-  position: absolute;
-  width: 35%; height: 35%;
-  border-radius: 50%;
-  top: 30%; left: 32%;
-  background: rgba(255,255,255,0.6);
-  filter: blur(2px);
-}
-
-.child-label {
-  position: absolute;
-  bottom: -22px; left: 50%;
+  top: 80px;
+  left: 50%;
   transform: translateX(-50%);
-  font-size: 9px;
-  color: rgba(255,255,255,0.7);
-  white-space: nowrap;
-  font-family: var(--font-mono);
-  letter-spacing: 1px;
-}
-
-/* Survival shake */
-.survival-shake {
-  animation: childFloat 6s ease-in-out infinite, survivalShake 0.3s ease-in-out infinite !important;
-}
-
-@keyframes survivalShake {
-  0%, 100% { margin-left: 0; }
-  25%       { margin-left: -3px; }
-  75%       { margin-left: 3px; }
-}
-
-/* Termination death */
-.dying {
-  animation: deathShrink 1.5s ease-in forwards !important;
-}
-@keyframes deathShrink {
-  0%   { opacity: 1; transform: translate(-50%,-50%) scale(1); }
-  30%  { opacity: 1; transform: translate(-50%,-50%) scale(1.3); filter: brightness(3) saturate(0); }
-  100% { opacity: 0; transform: translate(-50%,-50%) scale(0); }
-}
-
-/* Reproduction flash */
-.reproducing {
-  animation: reproFlash 1s ease-out forwards !important;
-}
-@keyframes reproFlash {
-  0%   { filter: brightness(1); }
-  30%  { filter: brightness(8) hue-rotate(60deg); }
-  60%  { filter: brightness(3); }
-  100% { filter: brightness(1); opacity: 0.3; }
-}
-
-/* ── HUD Overlays ─────────────────────────────────────────── */
-#hud {
-  position: fixed; inset: 0;
-  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   pointer-events: none;
 }
 
-/* Top center gen counter */
-#gen-display {
-  position: absolute;
-  top: 24px; left: 50%;
-  transform: translateX(-50%);
-  text-align: center;
-  pointer-events: none;
+#gaia-sprite {
+  animation: gaiaBoB 2s ease-in-out infinite;
+  display: block;
 }
-#gen-number {
-  font-family: var(--font-main);
-  font-size: 48px;
-  font-weight: 900;
-  color: var(--gaia-core);
-  text-shadow: 0 0 20px var(--gaia-core), 0 0 40px rgba(0,255,136,0.5);
-  line-height: 1;
-  letter-spacing: 4px;
+
+@keyframes gaiaBoB {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
 }
-#gen-label {
+
+#gaia-name {
   font-size: 10px;
-  letter-spacing: 6px;
-  color: rgba(0,255,136,0.6);
-  text-transform: uppercase;
+  color: var(--green);
+  text-shadow: 0 0 10px var(--green), 0 0 20px var(--green);
+  letter-spacing: 3px;
   margin-top: 2px;
 }
 
-/* Top left stats */
+.gaia-stat-line {
+  font-size: 6px;
+  color: var(--green-dim);
+  letter-spacing: 1px;
+}
+
+.gaia-stat-line span {
+  color: var(--green);
+}
+
+/* HUD overlay */
+#hud {
+  position: fixed; inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.pixel-panel {
+  background: rgba(4,4,14,0.92);
+  border: 2px solid var(--green);
+  padding: 8px 10px;
+  box-shadow: 3px 3px 0 rgba(0,238,119,0.25);
+}
+
+/* GEN counter — top center */
+#gen-display {
+  position: absolute;
+  top: 14px; left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+#gen-number {
+  font-size: 20px;
+  color: var(--green);
+  text-shadow:
+    0 0 8px var(--green),
+    0 0 16px var(--green),
+    2px 2px 0 #003322;
+  letter-spacing: 4px;
+}
+
+/* Top-left stats */
 #stats-left {
   position: absolute;
-  top: 24px; left: 24px;
+  top: 14px; left: 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  pointer-events: none;
+  gap: 5px;
 }
 
-/* Top right stats */
+.stat-row {
+  font-size: 6px;
+  color: rgba(0,238,119,0.6);
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+.stat-row .val {
+  color: var(--white);
+}
+
+/* Top-right stats */
 #stats-right {
   position: absolute;
-  top: 24px; right: 24px;
+  top: 14px; right: 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 5px;
   text-align: right;
-  pointer-events: none;
 }
 
-.stat-chip {
-  background: rgba(5,13,26,0.8);
-  border: 1px solid rgba(0,255,136,0.2);
-  border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 11px;
-  color: rgba(0,255,136,0.8);
-  letter-spacing: 1px;
-  backdrop-filter: blur(8px);
-}
-.stat-chip span {
-  color: var(--white);
-  font-weight: bold;
-  margin-left: 6px;
-}
-
-/* Bottom event feed */
-#event-feed {
+/* Balance — bottom right above event log */
+#balance-box {
   position: absolute;
-  bottom: 24px; left: 24px;
+  bottom: 90px; right: 14px;
+  text-align: right;
+}
+
+#balance-amount {
+  font-size: 14px;
+  color: var(--green);
+  text-shadow: 0 0 8px var(--green), 2px 2px 0 #003322;
+}
+
+#balance-label {
+  font-size: 5px;
+  color: rgba(0,238,119,0.4);
+  margin-top: 4px;
+  letter-spacing: 2px;
+}
+
+/* Event log — bottom ticker */
+#event-log {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 80px;
+  background: rgba(0,0,0,0.85);
+  border-top: 2px solid var(--green);
   display: flex;
-  flex-direction: column-reverse;
-  gap: 4px;
-  pointer-events: none;
-  max-width: 400px;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 6px 10px;
+  gap: 3px;
+  overflow: hidden;
 }
 
-.event-line {
-  font-size: 11px;
-  letter-spacing: 0.5px;
-  padding: 3px 8px;
-  border-radius: 2px;
-  animation: eventFadeIn 0.4s ease-out;
-  background: rgba(5,13,26,0.7);
-  border-left: 2px solid var(--gaia-core);
+#event-log-title {
+  position: absolute;
+  top: 6px; left: 10px;
+  font-size: 5px;
+  color: rgba(0,238,119,0.35);
+  letter-spacing: 2px;
 }
-.event-line.danger { border-left-color: var(--red); color: #ff8899; }
-.event-line.success { border-left-color: var(--gaia-core); color: #88ffcc; }
-.event-line.warn { border-left-color: var(--amber); color: #ffcc66; }
-.event-line.info { border-left-color: var(--teal); color: #88eeff; }
 
-@keyframes eventFadeIn {
-  from { opacity: 0; transform: translateX(-10px); }
+.log-line {
+  font-size: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 1px 0 1px 6px;
+  animation: logIn 0.25s ease-out;
+}
+.log-line.danger  { color: #ff7788; border-left: 2px solid var(--red); }
+.log-line.success { color: #66ffaa; border-left: 2px solid var(--green); }
+.log-line.warn    { color: #ffcc55; border-left: 2px solid var(--amber); }
+.log-line.info    { color: #66aaff; border-left: 2px solid var(--blue); }
+
+@keyframes logIn {
+  from { opacity: 0; transform: translateX(-6px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 
-/* Bottom right balance */
-#balance-display {
-  position: absolute;
-  bottom: 24px; right: 24px;
-  text-align: right;
-  pointer-events: none;
-}
-#balance-amount {
-  font-family: var(--font-main);
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--gaia-core);
-  text-shadow: 0 0 12px var(--gaia-core);
-  letter-spacing: 2px;
-}
-#balance-label {
-  font-size: 9px;
-  letter-spacing: 4px;
-  color: rgba(0,255,136,0.5);
-  text-transform: uppercase;
+/* Child creature wrappers */
+.creature-wrap {
+  position: fixed;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-/* Floating event popups */
-#floaters {
-  position: fixed; inset: 0;
+.creature-sprite {
+  display: block;
+  image-rendering: pixelated;
+}
+
+/* pixel health bar */
+.hp-bar-bg {
+  width: 32px;
+  height: 4px;
+  background: #111122;
+  border: 1px solid rgba(255,255,255,0.15);
+  margin-bottom: 2px;
+  margin-top: -4px;
+}
+.hp-bar-fill {
+  height: 100%;
+  background: var(--green);
+  transition: width 2s linear, background 1s;
+}
+.hp-bar-fill.med  { background: var(--amber); }
+.hp-bar-fill.low  { background: var(--red); }
+
+.creature-id {
+  font-size: 4px;
+  color: rgba(200,220,255,0.4);
+  text-align: center;
+  max-width: 64px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* spawn pop */
+@keyframes spawnPop {
+  0%   { transform: scale(0); opacity: 0; }
+  55%  { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.spawning {
+  animation: spawnPop 0.45s cubic-bezier(.17,.67,.55,1.4) forwards;
+}
+
+/* survival flash */
+@keyframes survivalFlicker {
+  0%, 100% { filter: brightness(1); }
+  50%       { filter: brightness(1.6) saturate(2); }
+}
+.survival-mode .creature-sprite {
+  animation: survivalFlicker 0.35s ease-in-out infinite;
+}
+
+/* death shrink */
+@keyframes deathShrink {
+  0%   { opacity: 1; transform: scale(1); }
+  30%  { opacity: 1; transform: scale(1.4); filter: brightness(3) saturate(0); }
+  100% { opacity: 0; transform: scale(0); }
+}
+.dying-anim {
+  animation: deathShrink 0.8s ease-in forwards !important;
+  pointer-events: none;
+}
+
+/* reproduction flash */
+@keyframes reproFlash {
+  0%   { filter: brightness(1); }
+  20%  { filter: brightness(6) saturate(0) invert(1); }
+  50%  { filter: brightness(3) hue-rotate(120deg); }
+  100% { filter: brightness(1); opacity: 0; }
+}
+.repro-anim {
+  animation: reproFlash 0.9s ease-out forwards !important;
+  pointer-events: none;
+}
+
+/* pixel explosion particles */
+@keyframes pixelFly {
+  0%   { opacity: 1; transform: translate(0,0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx),var(--dy)) scale(0.5); }
+}
+.explosion-px {
+  position: fixed;
+  width: 4px; height: 4px;
+  pointer-events: none;
   z-index: 30;
-  pointer-events: none;
+  animation: pixelFly 0.7s ease-out forwards;
 }
 
-.floater {
-  position: absolute;
-  font-size: 13px;
-  font-family: var(--font-mono);
-  letter-spacing: 1px;
+/* floating popup text */
+.pixel-floater {
+  position: fixed;
+  font-size: 7px;
   pointer-events: none;
-  animation: floatUp 3s ease-out forwards;
+  z-index: 40;
+  white-space: nowrap;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.9);
+  animation: floatUp 2.2s ease-out forwards;
 }
 @keyframes floatUp {
-  0%   { opacity: 0; transform: translateY(0) translateX(-50%); }
+  0%   { opacity: 0; transform: translateX(-50%) translateY(0); }
   15%  { opacity: 1; }
   80%  { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-80px) translateX(-50%); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-56px); }
 }
 
-/* Tooltip */
-#tooltip {
+/* tooltip */
+#tip {
   position: fixed;
   z-index: 50;
-  background: rgba(5,13,26,0.95);
-  border: 1px solid rgba(0,255,136,0.3);
-  border-radius: 6px;
-  padding: 12px 16px;
-  font-size: 11px;
-  line-height: 1.8;
-  color: var(--white);
+  background: #04040e;
+  border: 2px solid var(--green);
+  box-shadow: 3px 3px 0 rgba(0,238,119,0.2);
+  padding: 8px 10px;
+  font-size: 6px;
+  line-height: 2.2;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.2s;
-  max-width: 220px;
-  backdrop-filter: blur(12px);
+  transition: opacity 0.1s;
+  min-width: 160px;
 }
-#tooltip.visible { opacity: 1; }
-#tooltip .tt-id { color: var(--gaia-core); font-size: 12px; letter-spacing: 2px; margin-bottom: 6px; }
-#tooltip .tt-row { display: flex; justify-content: space-between; gap: 16px; }
-#tooltip .tt-key { color: rgba(0,255,136,0.5); }
-#tooltip .tt-val { color: var(--white); }
-
-/* ── Particle canvas ──────────────────────────────────────── */
-/* handled in JS */
+#tip.show { opacity: 1; }
+#tip .tt-head {
+  font-size: 7px;
+  color: var(--green);
+  text-shadow: 0 0 6px var(--green);
+  margin-bottom: 5px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--green-dark);
+}
+#tip .tt-row { display: flex; justify-content: space-between; gap: 14px; color: rgba(0,238,119,0.55); }
+#tip .tt-row .v { color: var(--white); }
 </style>
 </head>
 <body>
+<div id="grid-bg"></div>
+<div id="scanlines"></div>
 
-<canvas id="cosmos"></canvas>
-<svg id="connections"></svg>
-<div id="scene">
-  <div id="gaia-organism" class="organism">
-    <div class="gaia-ring" style="width:160%;height:160%;position:absolute;top:50%;left:50%;margin-left:-80%;margin-top:-80%;"></div>
-    <div class="gaia-ring" style="width:220%;height:220%;position:absolute;top:50%;left:50%;margin-left:-110%;margin-top:-110%;"></div>
-    <div class="gaia-ring" style="width:300%;height:300%;position:absolute;top:50%;left:50%;margin-left:-150%;margin-top:-150%;"></div>
-    <div class="gaia-core" style="width:100%;height:100%;border-radius:50%;"></div>
+<div id="world">
+  <div id="gaia-zone">
+    <div id="gaia-sprite"></div>
+    <div id="gaia-name">★ GAIA ★</div>
+    <div class="gaia-stat-line" id="gaia-mode-line">MODE: <span id="gaia-mode">STABLE</span></div>
+    <div class="gaia-stat-line">GEN <span id="gaia-gen">1</span> &nbsp;|&nbsp; COLONY <span id="gaia-pop">0</span>/12</div>
   </div>
 </div>
-<div id="floaters"></div>
 
 <div id="hud">
-  <div id="gen-display">
+  <div id="gen-display" class="pixel-panel">
     <div id="gen-number">GEN 1</div>
-    <div id="gen-label">generation</div>
   </div>
 
-  <div id="stats-left">
-    <div class="stat-chip">ALIVE <span id="s-alive">0</span></div>
-    <div class="stat-chip">TERMINATED <span id="s-dead">0</span></div>
-    <div class="stat-chip">REPRODUCED <span id="s-repro">0</span></div>
+  <div id="stats-left" class="pixel-panel">
+    <div class="stat-row">ALIVE     <span class="val" id="s-alive">0</span></div>
+    <div class="stat-row">DEAD      <span class="val" id="s-dead">0</span></div>
+    <div class="stat-row">BORN      <span class="val" id="s-repro">0</span></div>
   </div>
 
-  <div id="stats-right">
-    <div class="stat-chip">EARNED <span id="s-earned">$0.0000</span></div>
-    <div class="stat-chip">EMERGENCY <span id="s-emergency">0</span></div>
-    <div class="stat-chip">UPTIME <span id="s-uptime">0m</span></div>
+  <div id="stats-right" class="pixel-panel">
+    <div class="stat-row">EARNED    <span class="val" id="s-earned">$0.0000</span></div>
+    <div class="stat-row">EMERGENCY <span class="val" id="s-emerg">0</span></div>
+    <div class="stat-row">UPTIME    <span class="val" id="s-uptime">0m</span></div>
   </div>
 
-  <div id="event-feed"></div>
+  <div id="balance-box" class="pixel-panel">
+    <div id="balance-amount">$-.----</div>
+    <div id="balance-label">USDC BALANCE</div>
+  </div>
 
-  <div id="balance-display">
-    <div id="balance-amount">-.----</div>
-    <div id="balance-label">USDC balance</div>
+  <div id="event-log">
+    <span id="event-log-title">// EVENT LOG</span>
   </div>
 </div>
 
-<div id="tooltip">
-  <div class="tt-id" id="tt-id"></div>
-  <div class="tt-row"><span class="tt-key">fitness</span><span class="tt-val" id="tt-fit"></span></div>
-  <div class="tt-row"><span class="tt-key">hours left</span><span class="tt-val" id="tt-hrs"></span></div>
-  <div class="tt-row"><span class="tt-key">earned</span><span class="tt-val" id="tt-earn"></span></div>
-  <div class="tt-row"><span class="tt-key">tasks</span><span class="tt-val" id="tt-tasks"></span></div>
-  <div class="tt-row"><span class="tt-key">spec</span><span class="tt-val" id="tt-spec"></span></div>
-  <div class="tt-row"><span class="tt-key">desp</span><span class="tt-val" id="tt-desp"></span></div>
-  <div class="tt-row"><span class="tt-key">WTL</span><span class="tt-val" id="tt-wtl"></span></div>
+<div id="tip">
+  <div class="tt-head" id="tt-id">-</div>
+  <div class="tt-row">FITNESS   <span class="v" id="tt-fit">-</span></div>
+  <div class="tt-row">TIME LEFT <span class="v" id="tt-hrs">-</span></div>
+  <div class="tt-row">EARNED    <span class="v" id="tt-earn">-</span></div>
+  <div class="tt-row">TASKS     <span class="v" id="tt-tasks">-</span></div>
+  <div class="tt-row">SPEC      <span class="v" id="tt-spec">-</span></div>
+  <div class="tt-row">DESP      <span class="v" id="tt-desp">-</span></div>
+  <div class="tt-row">WTL       <span class="v" id="tt-wtl">-</span></div>
 </div>
 
 <script>
-// ── Constants ──────────────────────────────────────────────────
-const KITE_RPC   = 'https://rpc.gokite.ai'
-const KITE_CHAIN = 2366
-const USDC_ADDR  = '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e'
-const GAIA_ADDR  = '0x9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'
+// ═══════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════
+const KITE_RPC  = 'https://rpc.gokite.ai'
+const USDC_ADDR = '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e'
+const GAIA_ADDR = '0x9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'
 
-const SPEC_COLORS = {
-  content:  { h: 140, s: 80, l: 50 },
-  tech:     { h: 210, s: 80, l: 55 },
-  business: { h: 30,  s: 90, l: 55 },
-  research: { h: 270, s: 70, l: 60 },
-  default:  { h: 170, s: 70, l: 50 },
+const PS = 4  // pixels per map-cell for children (32px / 8 = 4)
+const PS2 = 4 // pixels per map-cell for GAIA (64px / 16 = 4)
+const BASE_SPEED = 0.8
+const SURVIVAL_SPEED_MULT = 2.8
+
+// ═══════════════════════════════════════════════════════════════
+// PIXEL ART MAPS
+// ═══════════════════════════════════════════════════════════════
+
+// Format: rows of strings, '0'=transparent, '1'=main, '2'=dark/detail, '3'=accent
+const CREATURE_MAPS = {
+  generalist: [
+    '00111000',
+    '01111100',
+    '11111110',
+    '11211210',
+    '11111110',
+    '01131100',
+    '00111000',
+    '00000000',
+  ],
+  content: [
+    '00011000',
+    '00311100',
+    '01111110',
+    '11211110',
+    '01111100',
+    '00311000',
+    '00011100',
+    '00000000',
+  ],
+  tech: [
+    '00010000',
+    '01111100',
+    '11111110',
+    '12111210',
+    '11111110',
+    '01131100',
+    '01000100',
+    '00000000',
+  ],
+  business: [
+    '01111100',
+    '11111110',
+    '00111000',
+    '00211200',
+    '00111000',
+    '03111300',
+    '00111000',
+    '00000000',
+  ],
+  research: [
+    '00111000',
+    '01111100',
+    '12211210',
+    '12111210',
+    '01111100',
+    '03333300',
+    '00101000',
+    '00000000',
+  ],
+  crypto: [
+    '00111000',
+    '01111100',
+    '11211210',
+    '11311310',
+    '11311310',
+    '11211210',
+    '01111100',
+    '00111000',
+  ],
 }
 
-function specColor(spec, alpha = 1) {
-  const c = SPEC_COLORS[spec] || SPEC_COLORS.default
-  return `hsla(${c.h},${c.s}%,${c.l}%,${alpha})`
+const CREATURE_COLORS = {
+  generalist: { '1': '#ddeeff', '2': '#334466', '3': '#ff4444' },
+  content:    { '1': '#4488ff', '2': '#001133', '3': '#ffcc00' },
+  tech:       { '1': '#99aacc', '2': '#88ddff', '3': '#223344' },
+  business:   { '1': '#ff8833', '2': '#221100', '3': '#993311' },
+  research:   { '1': '#cc66ff', '2': '#440066', '3': '#ffffff' },
+  crypto:     { '1': '#ffdd00', '2': '#cc6600', '3': '#886600' },
 }
 
-function specGlow(spec) {
-  const c = SPEC_COLORS[spec] || SPEC_COLORS.default
-  return `hsla(${c.h},${c.s}%,${c.l}%,0.8)`
-}
+const SURVIVAL_COLORS = { '1': '#ff3344', '2': '#220000', '3': '#ff8800' }
 
-// ── Particle system ────────────────────────────────────────────
-const canvas = document.getElementById('cosmos')
-const ctx    = canvas.getContext('2d')
-let W, H, particles = []
+// GAIA 16×16 at PS2 per cell = 64×64
+const GAIA_MAP = [
+  '0000011110000000',
+  '0001111111100000',
+  '0011111111110000',
+  '0111111111111000',
+  '0112211111221100',
+  '1111221111221111',
+  '1111111111111111',
+  '1111111111111111',
+  '1111111111111111',
+  '1111111331111111',
+  '0111113333311110',
+  '0111111111111110',
+  '0011111111111100',
+  '0001111111110000',
+  '0000111111100000',
+  '0000011110000000',
+]
+const GAIA_COLORS = { '1': '#00ee77', '2': '#002211', '3': '#001108' }
+const GAIA_STRUGGLING_COLORS = { '1': '#ffcc00', '2': '#221100', '3': '#110000' }
+const GAIA_DYING_COLORS      = { '1': '#884422', '2': '#220800', '3': '#110000' }
+const GAIA_THRIVING_COLORS   = { '1': '#44ffaa', '2': '#003322', '3': '#001108' }
 
-function resizeCanvas() {
-  W = canvas.width  = window.innerWidth
-  H = canvas.height = window.innerHeight
-}
+// ═══════════════════════════════════════════════════════════════
+// SVG PIXEL ART BUILDER
+// ═══════════════════════════════════════════════════════════════
 
-function initParticles(n = 120) {
-  particles = []
-  for (let i = 0; i < n; i++) {
-    particles.push({
-      x: Math.random() * W,
-      y: Math.random() * H,
-      r: Math.random() * 1.5 + 0.3,
-      vx: (Math.random() - 0.5) * 0.2,
-      vy: (Math.random() - 0.5) * 0.2,
-      hue: Math.random() < 0.5 ? 150 + Math.random() * 40 : 190 + Math.random() * 30,
-      alpha: Math.random() * 0.6 + 0.1,
-    })
-  }
-}
-
-function drawParticles() {
-  ctx.clearRect(0, 0, W, H)
-
-  // deep space gradient
-  const grad = ctx.createRadialGradient(W/2, H*0.35, 0, W/2, H/2, Math.max(W,H)*0.8)
-  grad.addColorStop(0,   'rgba(5,20,40,1)')
-  grad.addColorStop(0.5, 'rgba(5,13,26,1)')
-  grad.addColorStop(1,   'rgba(2,6,14,1)')
-  ctx.fillStyle = grad
-  ctx.fillRect(0, 0, W, H)
-
-  for (const p of particles) {
-    p.x += p.vx; p.y += p.vy
-    if (p.x < 0) p.x = W
-    if (p.x > W) p.x = 0
-    if (p.y < 0) p.y = H
-    if (p.y > H) p.y = 0
-
-    ctx.beginPath()
-    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2)
-    ctx.fillStyle = `hsla(${p.hue},80%,70%,${p.alpha})`
-    ctx.fill()
-  }
-}
-
-// ── Organism positioning ───────────────────────────────────────
-let gaiaPos = { x: 0, y: 0 }
-let childPositions = {}  // id -> {x, y, targetX, targetY}
-let prevColonyData  = null
-
-function gaiaSize(colonyData) {
-  const alive = colonyData ? colonyData.alive : 0
-  const base = Math.min(W, H) * 0.12
-  return Math.max(80, Math.min(180, base + alive * 8))
-}
-
-function placeGaia(colonyData) {
-  gaiaPos.x = W / 2
-  gaiaPos.y = H * 0.28
-  const sz = gaiaSize(colonyData)
-  const el = document.getElementById('gaia-organism')
-  el.style.left   = gaiaPos.x + 'px'
-  el.style.top    = gaiaPos.y + 'px'
-  el.style.width  = sz + 'px'
-  el.style.height = sz + 'px'
-
-  // Adjust glow based on colony health
-  let mode = 'stable'
-  if (colonyData) {
-    const inSurvival = (colonyData.children || []).filter(c => c.survivalMode && c.status === 'alive').length
-    const alive = colonyData.alive || 0
-    if (alive === 0) mode = 'dying'
-    else if (inSurvival > alive * 0.5) mode = 'struggling'
-    else if (colonyData.totalEarned > 1) mode = 'thriving'
-  }
-  const core = el.querySelector('.gaia-core')
-  if (mode === 'dying') {
-    core.style.background = 'radial-gradient(circle at 40% 35%, #886644 0%, #553311 50%, #221100 100%)'
-    core.style.boxShadow = '0 0 20px 10px rgba(100,60,0,0.4)'
-  } else if (mode === 'struggling') {
-    core.style.background = 'radial-gradient(circle at 40% 35%, #ffcc44 0%, #cc8800 40%, #664400 100%)'
-    core.style.boxShadow = '0 0 30px 15px rgba(200,120,0,0.5), 0 0 60px 30px rgba(180,100,0,0.2)'
-  } else if (mode === 'thriving') {
-    core.style.background = 'radial-gradient(circle at 40% 35%, #ffffff 0%, #44ffaa 25%, #00ff88 55%, #003322 100%)'
-    core.style.boxShadow = '0 0 60px 30px rgba(0,255,136,0.7), 0 0 120px 60px rgba(0,255,136,0.35), 0 0 220px 100px rgba(0,200,100,0.2)'
-  } else {
-    core.style.background = ''
-    core.style.boxShadow  = ''
-  }
-}
-
-function assignChildPositions(children) {
-  const alive = children.filter(c => c.status === 'alive')
-  const n = alive.length
-  if (n === 0) return
-
-  const cx = W / 2
-  const cy = gaiaPos.y
-  const radius = Math.min(W, H) * 0.32
-
-  alive.forEach((child, i) => {
-    const angle = (i / n) * Math.PI * 2 - Math.PI / 2
-    const spread = 0.08 * (i % 2 === 0 ? 1 : -1)
-    const r = radius * (0.85 + spread)
-    const tx = cx + Math.cos(angle) * r
-    const ty = cy + H * 0.18 + Math.sin(angle) * r * 0.55
-
-    if (!childPositions[child.id]) {
-      childPositions[child.id] = { x: tx, y: ty, tx, ty }
-    } else {
-      childPositions[child.id].tx = tx
-      childPositions[child.id].ty = ty
+function buildSVG(map, colorMap, cellPx) {
+  const cols = map[0].length
+  const rows = map.length
+  const w = cols * cellPx
+  const h = rows * cellPx
+  let rects = ''
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const ch = map[r][c]
+      if (ch !== '0' && colorMap[ch]) {
+        rects += `<rect x="${c * cellPx}" y="${r * cellPx}" width="${cellPx}" height="${cellPx}" fill="${colorMap[ch]}"/>`
+      }
     }
-  })
-}
-
-// ── SVG connections ────────────────────────────────────────────
-function drawConnections(children) {
-  const svg = document.getElementById('connections')
-  svg.setAttribute('width', W)
-  svg.setAttribute('height', H)
-  svg.innerHTML = `<defs>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="3" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-  </defs>`
-
-  const alive = children.filter(c => c.status === 'alive')
-  for (const child of alive) {
-    const pos = childPositions[child.id]
-    if (!pos) continue
-    const col = specColor(child.genome?.specialization, 0.5)
-    const colBright = specColor(child.genome?.specialization, 0.9)
-
-    // Flowing nutrient path
-    const mx = (gaiaPos.x + pos.x) / 2 + (Math.random() * 60 - 30)
-    const my = (gaiaPos.y + pos.y) / 2 + (Math.random() * 40 - 20)
-
-    const path = document.createElementNS('http://www.w3.org/2000/svg','path')
-    const d = `M ${gaiaPos.x} ${gaiaPos.y} Q ${mx} ${my} ${pos.x} ${pos.y}`
-    path.setAttribute('d', d)
-    path.setAttribute('fill', 'none')
-    path.setAttribute('stroke', child.survivalMode ? 'rgba(255,51,68,0.4)' : col)
-    path.setAttribute('stroke-width', child.survivalMode ? '1.5' : '1')
-    path.setAttribute('filter', 'url(#glow)')
-
-    // animated dash flow
-    const len = 200
-    path.setAttribute('stroke-dasharray', `${len} 9999`)
-    path.setAttribute('stroke-dashoffset', len)
-    const anim = document.createElementNS('http://www.w3.org/2000/svg','animate')
-    anim.setAttribute('attributeName','stroke-dashoffset')
-    anim.setAttribute('from', len)
-    anim.setAttribute('to', `-${len}`)
-    anim.setAttribute('dur', child.survivalMode ? '1.2s' : '2.5s')
-    anim.setAttribute('repeatCount','indefinite')
-    path.appendChild(anim)
-    svg.appendChild(path)
-
-    // Static faint line underneath
-    const base = document.createElementNS('http://www.w3.org/2000/svg','path')
-    base.setAttribute('d', d)
-    base.setAttribute('fill', 'none')
-    base.setAttribute('stroke', child.survivalMode ? 'rgba(255,51,68,0.1)' : col.replace('0.5','0.12'))
-    base.setAttribute('stroke-width', '0.5')
-    svg.insertBefore(base, svg.firstChild)
   }
+  return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">${rects}</svg>`
 }
 
-// ── Child DOM management ───────────────────────────────────────
-const knownChildren = {}
-
-function childOrgSize(fit) {
-  return Math.max(36, Math.min(90, 36 + fit * 28))
+function setSVG(el, map, colorMap, cellPx) {
+  el.innerHTML = buildSVG(map, colorMap, cellPx)
 }
 
-function pulseSpeed(child) {
+// ═══════════════════════════════════════════════════════════════
+// GAIA MOTHER RENDERER
+// ═══════════════════════════════════════════════════════════════
+
+let lastGaiaMode = 'stable'
+
+function renderGaia(mode) {
+  if (mode === lastGaiaMode) return
+  lastGaiaMode = mode
+  const el = document.getElementById('gaia-sprite')
+  let colors = GAIA_COLORS
+  if (mode === 'dying' || mode === 'critical') colors = GAIA_DYING_COLORS
+  else if (mode === 'survival' || mode === 'unstable') colors = GAIA_STRUGGLING_COLORS
+  else if (mode === 'thriving') colors = GAIA_THRIVING_COLORS
+  setSVG(el, GAIA_MAP, colors, PS2)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CREATURE MOVEMENT ENGINE
+// ═══════════════════════════════════════════════════════════════
+
+let W = window.innerWidth
+let H = window.innerHeight
+const GAIA_ZONE_BOTTOM = 260  // creatures stay below this
+const LOG_HEIGHT = 82
+const EDGE = 10
+
+const creatures = new Map()  // id -> { el, x, y, vx, vy, data }
+
+function randomVelocity(speed) {
+  const angle = Math.random() * Math.PI * 2
+  return { vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed }
+}
+
+function spawnCreature(child) {
+  if (creatures.has(child.id)) return
+
+  const spec = child.genome?.specialization || 'generalist'
+  const colorMap = child.survivalMode ? SURVIVAL_COLORS : (CREATURE_COLORS[spec] || CREATURE_COLORS.generalist)
+  const map = CREATURE_MAPS[spec] || CREATURE_MAPS.generalist
+
+  // Starting position: random in safe zone, clear of GAIA
+  const x = EDGE + 32 + Math.random() * (W - EDGE * 2 - 64)
+  const y = GAIA_ZONE_BOTTOM + Math.random() * (H - GAIA_ZONE_BOTTOM - LOG_HEIGHT - 64)
+  const { vx, vy } = randomVelocity(BASE_SPEED)
+
+  // Build DOM
+  const wrap = document.createElement('div')
+  wrap.className = 'creature-wrap spawning'
+  wrap.id = 'cw-' + child.id.replace(/[^a-z0-9]/gi, '-')
+
+  const svgEl = document.createElement('div')
+  svgEl.className = 'creature-sprite'
+  svgEl.innerHTML = buildSVG(map, colorMap, PS)
+
+  const hpBg = document.createElement('div')
+  hpBg.className = 'hp-bar-bg'
+  const hpFill = document.createElement('div')
+  hpFill.className = 'hp-bar-fill'
+  hpBg.appendChild(hpFill)
+
+  const label = document.createElement('div')
+  label.className = 'creature-id'
+  label.textContent = child.id.replace('GAIA-', '')
+
+  wrap.appendChild(svgEl)
+  wrap.appendChild(hpBg)
+  wrap.appendChild(label)
+  document.body.appendChild(wrap)
+
+  wrap.style.left = x + 'px'
+  wrap.style.top  = y + 'px'
+
+  attachTip(wrap, child)
+
+  creatures.set(child.id, { el: wrap, svgEl, hpFill, x, y, vx, vy, data: child })
+}
+
+function updateCreature(child) {
+  const c = creatures.get(child.id)
+  if (!c) return
+  c.data = child
+
+  // Update sprite colors for survival mode
+  const spec = child.genome?.specialization || 'generalist'
+  const colorMap = child.survivalMode ? SURVIVAL_COLORS : (CREATURE_COLORS[spec] || CREATURE_COLORS.generalist)
+  c.svgEl.innerHTML = buildSVG(CREATURE_MAPS[spec] || CREATURE_MAPS.generalist, colorMap, PS)
+
   if (child.survivalMode) {
-    const d = child.desperationLevel || 1
-    return Math.max(0.4, 3 - d * 0.25) + 's'
-  }
-  return '3s'
-}
-
-function upsertChild(child) {
-  const pos = childPositions[child.id]
-  if (!pos) return
-
-  let el = knownChildren[child.id]
-  const isNew = !el
-  const sz  = childOrgSize(child.fitness)
-  const col = specColor(child.genome?.specialization)
-  const glow = specGlow(child.genome?.specialization)
-
-  if (isNew) {
-    el = document.createElement('div')
-    el.className = 'organism child-organism'
-    el.id = 'org-' + child.id.replace(/[^a-zA-Z0-9]/g, '-')
-    el.innerHTML = `<div class="child-body">
-      <div class="child-membrane"></div>
-      <div class="child-nucleus"></div>
-    </div>
-    <div class="child-label">${child.id.replace('GAIA-','')}</div>`
-    document.getElementById('scene').appendChild(el)
-    knownChildren[child.id] = el
-
-    // Spawn flash
-    el.style.opacity = '0'
-    el.style.transform = 'translate(-50%,-50%) scale(0)'
-    requestAnimationFrame(() => {
-      el.style.transition = 'opacity 0.6s, transform 0.6s'
-      el.style.opacity = '1'
-      el.style.transform = ''
-    })
-  }
-
-  el.style.left   = pos.x + 'px'
-  el.style.top    = pos.y + 'px'
-  el.style.width  = sz + 'px'
-  el.style.height = sz + 'px'
-
-  const body = el.querySelector('.child-body')
-  if (child.survivalMode) {
-    body.style.background = `radial-gradient(circle at 35% 30%, #ff8888, #cc2233, #440011)`
-    body.style.boxShadow  = `0 0 ${sz*0.4}px ${sz*0.15}px rgba(255,50,70,0.6)`
-    el.classList.add('survival-shake')
+    c.el.classList.add('survival-mode')
   } else {
-    body.style.background = `radial-gradient(circle at 35% 30%, white, ${col}, ${col.replace('1)','0.4)')})`
-    body.style.boxShadow  = `0 0 ${sz*0.3}px ${sz*0.1}px ${glow.replace('0.8','0.5')}`
-    el.classList.remove('survival-shake')
+    c.el.classList.remove('survival-mode')
   }
 
-  const membrane = el.querySelector('.child-membrane')
-  membrane.style.animationDuration = pulseSpeed(child)
-  membrane.style.borderColor = child.survivalMode
-    ? 'rgba(255,100,100,0.6)' : 'rgba(255,255,255,0.4)'
+  // Health bar
+  const fit = child.fitness || 0
+  const pct = Math.min(100, Math.max(0, fit * 50))  // 2.0 fitness = 100%
+  c.hpFill.style.width = pct + '%'
+  c.hpFill.className = 'hp-bar-fill' +
+    (fit < 0.3 ? ' low' : fit < 1.0 ? ' med' : '')
+
+  // Adjust speed
+  c.speed = child.survivalMode ? BASE_SPEED * SURVIVAL_SPEED_MULT : BASE_SPEED
 }
 
-function removeChild(id, animate = 'dying') {
-  const el = knownChildren[id]
-  if (!el) return
-  el.classList.add(animate)
+function removeCreature(id, anim) {
+  const c = creatures.get(id)
+  if (!c) return
+  c.el.classList.remove('spawning', 'survival-mode')
+  c.el.classList.add(anim === 'dying' ? 'dying-anim' : 'repro-anim')
+
+  if (anim === 'dying') {
+    spawnExplosion(c.x + 16, c.y + 16, c.data?.genome?.specialization)
+  }
+
   setTimeout(() => {
-    el.remove()
-    delete knownChildren[id]
-    delete childPositions[id]
-  }, 1600)
+    c.el.remove()
+    creatures.delete(id)
+  }, 1000)
 }
 
-// ── Floating popups ────────────────────────────────────────────
-function spawnFloater(text, x, y, color) {
-  const div = document.createElement('div')
-  div.className = 'floater'
-  div.textContent = text
-  div.style.left  = x + 'px'
-  div.style.top   = y + 'px'
-  div.style.color = color
-  document.getElementById('floaters').appendChild(div)
-  setTimeout(() => div.remove(), 3100)
+// ═══════════════════════════════════════════════════════════════
+// PIXEL EXPLOSION
+// ═══════════════════════════════════════════════════════════════
+
+const EXPLOSION_COLORS = ['#ff3344','#ff8800','#ffcc00','#ff4488','#ff6655']
+
+function spawnExplosion(cx, cy, spec) {
+  const baseColor = spec ? (CREATURE_COLORS[spec] || CREATURE_COLORS.generalist)['1'] : '#ff3344'
+  const colors = [baseColor, ...EXPLOSION_COLORS]
+  for (let i = 0; i < 16; i++) {
+    const px = document.createElement('div')
+    px.className = 'explosion-px'
+    const angle = (i / 16) * Math.PI * 2 + (Math.random() - 0.5) * 0.4
+    const dist = 24 + Math.random() * 40
+    const dx = Math.round(Math.cos(angle) * dist)
+    const dy = Math.round(Math.sin(angle) * dist)
+    px.style.cssText = `
+      left: ${cx}px; top: ${cy}px;
+      background: ${colors[i % colors.length]};
+      --dx: ${dx}px; --dy: ${dy}px;
+      animation-duration: ${0.4 + Math.random() * 0.4}s;
+    `
+    document.body.appendChild(px)
+    setTimeout(() => px.remove(), 900)
+  }
 }
 
-// ── Tooltip ────────────────────────────────────────────────────
-const tooltip = document.getElementById('tooltip')
-let tooltipTarget = null
+// ═══════════════════════════════════════════════════════════════
+// ANIMATION LOOP
+// ═══════════════════════════════════════════════════════════════
+
+let lastFrameTime = 0
+
+function animLoop(ts) {
+  const dt = Math.min((ts - lastFrameTime) / 16.67, 3)  // delta in ~frames, capped
+  lastFrameTime = ts
+
+  for (const [, c] of creatures) {
+    const speed = c.speed || BASE_SPEED
+    const jitter = (Math.random() - 0.5) * 0.06  // slight random wander
+
+    c.vx += jitter
+    c.vy += jitter
+
+    // Normalize to maintain speed
+    const mag = Math.sqrt(c.vx * c.vx + c.vy * c.vy)
+    if (mag > 0) {
+      c.vx = (c.vx / mag) * speed
+      c.vy = (c.vy / mag) * speed
+    }
+
+    c.x += c.vx * dt
+    c.y += c.vy * dt
+
+    // Bounce off edges
+    const minX = EDGE, maxX = W - EDGE - 32
+    const minY = GAIA_ZONE_BOTTOM, maxY = H - LOG_HEIGHT - EDGE - 48
+
+    if (c.x < minX) { c.x = minX; c.vx = Math.abs(c.vx) }
+    if (c.x > maxX) { c.x = maxX; c.vx = -Math.abs(c.vx) }
+    if (c.y < minY) { c.y = minY; c.vy = Math.abs(c.vy) }
+    if (c.y > maxY) { c.y = maxY; c.vy = -Math.abs(c.vy) }
+
+    c.el.style.left = Math.round(c.x) + 'px'
+    c.el.style.top  = Math.round(c.y) + 'px'
+  }
+
+  requestAnimationFrame(animLoop)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOOLTIP
+// ═══════════════════════════════════════════════════════════════
+
+const tip = document.getElementById('tip')
+let tipTarget = null
 
 document.addEventListener('mousemove', e => {
-  if (tooltipTarget) {
-    let tx = e.clientX + 16, ty = e.clientY - 10
-    if (tx + 240 > W) tx = e.clientX - 250
-    tooltip.style.left = tx + 'px'
-    tooltip.style.top  = ty + 'px'
-  }
+  if (!tipTarget) return
+  let tx = e.clientX + 14, ty = e.clientY - 8
+  if (tx + 180 > W) tx = e.clientX - 194
+  if (ty + 140 > H) ty = e.clientY - 148
+  tip.style.left = tx + 'px'
+  tip.style.top  = ty + 'px'
 })
 
-function attachTooltip(el, child) {
+function attachTip(el, child) {
   el.addEventListener('mouseenter', () => {
-    tooltipTarget = child.id
-    document.getElementById('tt-id').textContent   = child.id
-    document.getElementById('tt-fit').textContent  = child.fitness?.toFixed(4)
-    document.getElementById('tt-hrs').textContent  = child.hoursRemaining?.toFixed(1) + 'h'
-    document.getElementById('tt-earn').textContent = '$' + child.totalEarned?.toFixed(4)
-    document.getElementById('tt-tasks').textContent = child.tasks
-    document.getElementById('tt-spec').textContent  = child.genome?.specialization
-    document.getElementById('tt-desp').textContent  = child.desperationLevel + '/10'
-    document.getElementById('tt-wtl').textContent   = child.willToLive?.toFixed(4)
-    tooltip.classList.add('visible')
+    tipTarget = child.id
+    const c = creatures.get(child.id)
+    const d = c ? c.data : child
+    document.getElementById('tt-id').textContent    = d.id
+    document.getElementById('tt-fit').textContent   = (d.fitness || 0).toFixed(4)
+    document.getElementById('tt-hrs').textContent   = (d.hoursRemaining || 0).toFixed(1) + 'h'
+    document.getElementById('tt-earn').textContent  = '$' + (d.totalEarned || 0).toFixed(4)
+    document.getElementById('tt-tasks').textContent = d.tasks || 0
+    document.getElementById('tt-spec').textContent  = d.genome?.specialization || '?'
+    document.getElementById('tt-desp').textContent  = (d.desperationLevel || 0) + '/10'
+    document.getElementById('tt-wtl').textContent   = (d.willToLive || 0).toFixed(4)
+    tip.classList.add('show')
   })
   el.addEventListener('mouseleave', () => {
-    tooltipTarget = null
-    tooltip.classList.remove('visible')
+    tipTarget = null
+    tip.classList.remove('show')
   })
 }
 
-// ── Event feed ─────────────────────────────────────────────────
-let shownEvents = new Set()
+// ═══════════════════════════════════════════════════════════════
+// FLOATING TEXT POPUPS
+// ═══════════════════════════════════════════════════════════════
 
-function renderEvents(events) {
-  const feed = document.getElementById('event-feed')
-  const latest = events.slice(0, 7)
-  feed.innerHTML = ''
-  for (const ev of latest) {
-    const div = document.createElement('div')
-    div.className = 'event-line ' + (ev.type || 'info')
-    div.textContent = ev.time + ' — ' + ev.msg
-    feed.appendChild(div)
-  }
-
-  // Spawn floaters for new events
-  for (const ev of events.slice(0, 3)) {
-    const key = ev.time + ev.msg
-    if (shownEvents.has(key)) continue
-    shownEvents.add(key)
-    if (shownEvents.size > 200) shownEvents = new Set([...shownEvents].slice(-100))
-
-    const fx = W * 0.1 + Math.random() * W * 0.8
-    const fy = H * 0.4 + Math.random() * H * 0.3
-    const colors = { danger: '#ff4455', success: '#44ffaa', warn: '#ffaa22', info: '#44eeff' }
-    spawnFloater(ev.msg.slice(0, 60), fx, fy, colors[ev.type] || '#aaffcc')
-  }
+function floater(text, x, y, color) {
+  const d = document.createElement('div')
+  d.className = 'pixel-floater'
+  d.textContent = text
+  d.style.cssText = `left:${x}px; top:${y}px; color:${color};`
+  document.body.appendChild(d)
+  setTimeout(() => d.remove(), 2500)
 }
 
-// ── HUD update ─────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// HUD UPDATE
+// ═══════════════════════════════════════════════════════════════
+
 function updateHUD(data) {
-  document.getElementById('gen-number').textContent = 'GEN ' + (data.generation || 1)
+  const gen = data.generation || 1
+  document.getElementById('gen-number').textContent = 'GEN ' + gen
+  document.getElementById('gaia-gen').textContent   = gen
+  document.getElementById('gaia-pop').textContent   = data.alive || 0
   document.getElementById('s-alive').textContent    = data.alive || 0
   document.getElementById('s-dead').textContent     = data.terminated || 0
   document.getElementById('s-repro').textContent    = data.reproduced || 0
   document.getElementById('s-earned').textContent   = '$' + (data.totalEarned || 0).toFixed(4)
-  document.getElementById('s-emergency').textContent = data.emergencyRequests || 0
+  document.getElementById('s-emerg').textContent    = data.emergencyRequests || 0
 
   if (data.genesisTime) {
     const upMin = Math.floor((Date.now() - data.genesisTime) / 60000)
     document.getElementById('s-uptime').textContent = upMin < 60
       ? upMin + 'm'
-      : Math.floor(upMin/60) + 'h ' + (upMin%60) + 'm'
+      : Math.floor(upMin / 60) + 'h ' + (upMin % 60) + 'm'
+  }
+
+  // Derive GAIA mode from children
+  let mode = 'stable'
+  const children = data.children || []
+  const alive = children.filter(c => c.status === 'alive')
+  if (alive.length === 0) {
+    mode = 'dying'
+  } else {
+    const inSurvival = alive.filter(c => c.survivalMode).length
+    if (inSurvival > alive.length * 0.5) mode = 'survival'
+    else if (data.totalEarned > 3) mode = 'thriving'
+  }
+  document.getElementById('gaia-mode').textContent = mode.toUpperCase()
+  renderGaia(mode)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EVENT LOG
+// ═══════════════════════════════════════════════════════════════
+
+let shownEvents = new Set()
+
+function renderEvents(events) {
+  const log = document.getElementById('event-log')
+  const lines = events.slice(0, 6)
+
+  // Remove old log lines (keep the title span)
+  const title = document.getElementById('event-log-title')
+  log.innerHTML = ''
+  log.appendChild(title)
+
+  for (const ev of lines) {
+    const d = document.createElement('div')
+    d.className = 'log-line ' + (ev.type || 'info')
+    d.textContent = ev.time + ' > ' + ev.msg
+    log.appendChild(d)
+  }
+
+  // Floaters for new events
+  for (const ev of events.slice(0, 3)) {
+    const key = ev.time + ev.msg
+    if (shownEvents.has(key)) continue
+    shownEvents.add(key)
+    if (shownEvents.size > 300) shownEvents = new Set([...shownEvents].slice(-150))
+
+    const fx = W * 0.15 + Math.random() * W * 0.7
+    const fy = H * 0.35 + Math.random() * H * 0.25
+    const colors = { danger: '#ff5566', success: '#44ffaa', warn: '#ffcc44', info: '#55aaff' }
+    floater(ev.msg.slice(0, 48), fx, fy, colors[ev.type] || '#aaffcc')
   }
 }
 
-// ── Balance fetch ──────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// COLONY FETCH & SYNC
+// ═══════════════════════════════════════════════════════════════
+
+let prevChildren = {}
+
+async function fetchColony() {
+  let data
+  try {
+    const r = await fetch('/colony')
+    data = await r.json()
+  } catch (_) {
+    setTimeout(fetchColony, 5000)
+    return
+  }
+
+  updateHUD(data)
+  renderEvents(data.events || [])
+
+  const children = data.children || []
+  const aliveIds = new Set()
+
+  for (const child of children) {
+    if (child.status !== 'alive') continue
+    aliveIds.add(child.id)
+
+    if (!creatures.has(child.id)) {
+      spawnCreature(child)
+      floater('SPAWNED!', W * 0.3 + Math.random() * W * 0.4, H * 0.5, '#44ffcc')
+    } else {
+      updateCreature(child)
+    }
+  }
+
+  // Handle transitions (alive -> terminated/reproduced)
+  for (const child of children) {
+    const prev = prevChildren[child.id]
+    if (prev && prev.status === 'alive' && child.status !== 'alive') {
+      if (creatures.has(child.id)) {
+        const c = creatures.get(child.id)
+        const pos = { x: c.x + 16, y: c.y + 16 }
+        if (child.status === 'terminated') {
+          removeCreature(child.id, 'dying')
+          floater('TERMINATED', pos.x, pos.y - 20, '#ff4455')
+        } else if (child.status === 'reproduced') {
+          removeCreature(child.id, 'repro')
+          floater('REPRODUCED!', pos.x, pos.y - 20, '#ffffff')
+          // Spawn offspring hint floater
+          setTimeout(() => floater('NEW LIFE!', pos.x + (Math.random()-0.5)*60, pos.y - 50, '#44ffaa'), 500)
+        }
+      }
+    }
+  }
+
+  // Clean up creatures no longer in data
+  for (const [id] of creatures) {
+    if (!aliveIds.has(id)) {
+      removeCreature(id, 'dying')
+    }
+  }
+
+  // Build prev map
+  prevChildren = {}
+  for (const child of children) prevChildren[child.id] = child
+
+  setTimeout(fetchColony, 5000)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BALANCE FETCH
+// ═══════════════════════════════════════════════════════════════
+
 async function fetchBalance() {
   try {
     const r = await fetch(KITE_RPC, {
@@ -784,126 +963,33 @@ async function fetchBalance() {
     })
     const j = await r.json()
     if (j.result) {
-      const raw = parseInt(j.result, 16)
-      const bal = (raw / 1e6).toFixed(4)
+      const bal = (parseInt(j.result, 16) / 1e6).toFixed(4)
       document.getElementById('balance-amount').textContent = '$' + bal
     }
-  } catch(_) {}
+  } catch (_) {}
 }
 
-// ── Main data fetch & render ───────────────────────────────────
-async function fetchColony() {
-  let data
-  try {
-    const r = await fetch('/colony')
-    data = await r.json()
-  } catch(e) {
-    setTimeout(fetchColony, 5000)
-    return
-  }
+// ═══════════════════════════════════════════════════════════════
+// RESIZE
+// ═══════════════════════════════════════════════════════════════
 
-  placeGaia(data)
-  updateHUD(data)
-
-  const children = data.children || []
-
-  // Detect status changes vs previous
-  if (prevColonyData) {
-    const prevMap = {}
-    for (const c of prevColonyData.children || []) prevMap[c.id] = c
-
-    for (const child of children) {
-      const prev = prevMap[child.id]
-      if (prev && prev.status === 'alive' && child.status === 'terminated') {
-        const pos = childPositions[child.id]
-        if (pos) spawnFloater('TERMINATED', pos.x, pos.y - 30, '#ff3344')
-        removeChild(child.id, 'dying')
-      }
-      if (prev && prev.status === 'alive' && child.status === 'reproduced') {
-        const pos = childPositions[child.id]
-        if (pos) spawnFloater('REPRODUCED', pos.x, pos.y - 30, '#ffffff')
-        removeChild(child.id, 'reproducing')
-      }
-    }
-
-    // New children
-    const prevIds = new Set(prevColonyData.children.map(c => c.id))
-    for (const child of children) {
-      if (!prevIds.has(child.id) && child.status === 'alive') {
-        spawnFloater('NEW ORGANISM SPAWNED', W/2, H*0.5, '#44ffcc')
-      }
-    }
-  }
-
-  assignChildPositions(children)
-
-  const alive = children.filter(c => c.status === 'alive')
-  for (const child of alive) {
-    upsertChild(child)
-    const el = knownChildren[child.id]
-    if (el) attachTooltip(el, child)
-  }
-
-  // Remove DOM nodes for long-gone children
-  for (const id of Object.keys(knownChildren)) {
-    if (!alive.find(c => c.id === id)) {
-      removeChild(id, 'dying')
-    }
-  }
-
-  drawConnections(alive)
-  renderEvents(data.events || [])
-  prevColonyData = data
-
-  setTimeout(fetchColony, 5000)
-}
-
-// ── Render loop ────────────────────────────────────────────────
-function renderLoop() {
-  drawParticles()
-
-  // Lerp child positions toward targets
-  for (const id of Object.keys(childPositions)) {
-    const p = childPositions[id]
-    if (p.tx !== undefined) {
-      p.x += (p.tx - p.x) * 0.04
-      p.y += (p.ty - p.y) * 0.04
-    }
-    const el = knownChildren[id]
-    if (el) {
-      el.style.left = p.x + 'px'
-      el.style.top  = p.y + 'px'
-    }
-  }
-
-  requestAnimationFrame(renderLoop)
-}
-
-// ── Init ───────────────────────────────────────────────────────
 window.addEventListener('resize', () => {
-  resizeCanvas()
-  initParticles()
-  if (prevColonyData) {
-    placeGaia(prevColonyData)
-    assignChildPositions(prevColonyData.children || [])
-  }
+  W = window.innerWidth
+  H = window.innerHeight
 })
 
-resizeCanvas()
-initParticles()
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
 
-// place GAIA immediately
-placeGaia(null)
-const gaiaEl = document.getElementById('gaia-organism')
-gaiaEl.style.left   = (W/2) + 'px'
-gaiaEl.style.top    = (H*0.28) + 'px'
-gaiaEl.style.width  = '120px'
-gaiaEl.style.height = '120px'
+// Render initial GAIA
+setSVG(document.getElementById('gaia-sprite'), GAIA_MAP, GAIA_COLORS, PS2)
 
-renderLoop()
+// Start loops
+requestAnimationFrame(animLoop)
 fetchColony()
-setInterval(fetchBalance, 30000)
 fetchBalance()
+setInterval(fetchBalance, 30000)
 </script>
 </body>
 </html>
