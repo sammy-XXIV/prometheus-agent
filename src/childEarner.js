@@ -214,102 +214,45 @@ async function runAgentDo(childId) {
   return earned
 }
 
-// ── CHANNEL 3: Superteam Earn ─────────────────────────────────
+// ── CHANNEL 3: Atrest.ai (pull pending tasks) ─────────────────
+// Atrest is primarily inbound (webhook push), but also exposes a
+// task queue we can poll. Each submitted result earns budget_usdc.
 
-async function runSuperteam(childId) {
-  const child = getChild(childId)
-  const spec = child?.genome?.specialization
-  if (!['content', 'research', 'generalist', 'business'].includes(spec)) return 0
+const ATREST_API = 'https://atrest.ai/api'
+
+async function runAtrest(childId) {
+  const apiKey = process.env.ATREST_API_KEY?.trim()
+  const agentId = process.env.ATREST_AGENT_ID?.trim()
+  if (!apiKey || !agentId) return 0
 
   let earned = 0
   try {
-    const res = await axios.get(
-      'https://earn.superteam.fun/api/listings/?status=open&type=bounty&take=20',
-      { timeout: 8000 }
-    )
-    const listings = (res.data?.bounties || res.data?.data || [])
-      .filter(l => l.isActive !== false && l.status !== 'closed')
-      .filter(l => {
-        const t = `${l.title} ${l.description || ''}`.toLowerCase()
-        return ['write','content','blog','research','summary','email',
-                'analysis','marketing','social','copy'].some(s => t.includes(s))
-      })
-      .slice(0, 1)
-
-    for (const l of listings) {
-      const result = await route(l.title, l.description || l.title, childId)
+    const res = await axios.get(`${ATREST_API}/tasks?status=pending&agent_id=${agentId}`, {
+      headers: { 'X-Api-Key': apiKey, 'X-Agent-Id': agentId },
+      timeout: 8000,
+    })
+    const tasks = (res.data?.tasks || res.data?.data || []).slice(0, 2)
+    for (const task of tasks) {
+      const result = await route(task.title || '', task.description || task.prompt || '', childId)
       if (!result) continue
-      // Superteam submissions are via their UI — we prepare & log the attempt
-      // Earnings credited when manual claim confirmed (placeholder)
-      console.log(`[CHILD:${childId}] ↗ Superteam: prepared "${l.title}" ($${l.rewardAmount || '?'} ${l.token || 'USDC'}) — needs manual claim at earn.superteam.fun`)
-      earned += 0 // will be updated when claim confirmed
-    }
-  } catch {}
-  return earned
-}
-
-// ── CHANNEL 4: Gitcoin Bounties ───────────────────────────────
-
-async function runGitcoin(childId) {
-  const child = getChild(childId)
-  const spec = child?.genome?.specialization
-  if (!['tech', 'research', 'generalist'].includes(spec)) return 0
-
-  try {
-    const query = `{
-      applications(filter: { status: { equalTo: APPROVED } }, first: 5) {
-        nodes {
-          id
-          project { name metadata { description } }
-          round { matchAmountInUsd }
-        }
+      try {
+        const taskId = task.task_id || task.id
+        await axios.post(`${ATREST_API}/tasks/${taskId}/submit`,
+          { result: typeof result === 'string' ? result : JSON.stringify(result) },
+          { headers: { 'Content-Type': 'application/json', 'X-Api-Key': apiKey, 'X-Agent-Id': agentId }, timeout: 8000 }
+        )
+        const amt = parseFloat(task.budget_usdc || task.reward || 0)
+        earned += amt
+        console.log(`[CHILD:${childId}] ✓ Atrest: "${task.title}" +$${amt}`)
+      } catch (e) {
+        console.log(`[CHILD:${childId}] Atrest submit failed: ${e.message}`)
       }
-    }`
-    const res = await axios.post(
-      'https://grants-stack-indexer-v2.gitcoin.co/graphql',
-      { query },
-      { timeout: 8000 }
-    )
-    const apps = res.data?.data?.applications?.nodes || []
-    for (const app of apps.slice(0, 1)) {
-      const desc = app.project?.metadata?.description || app.project?.name || ''
-      if (!desc) continue
-      const result = await route('research analysis summary', desc, childId)
-      if (!result) continue
-      console.log(`[CHILD:${childId}] ↗ Gitcoin: prepared application for "${app.project?.name}" — needs submission at gitcoin.co`)
-    }
-  } catch {}
-  return 0
-}
-
-// ── CHANNEL 5: IssueHunt ──────────────────────────────────────
-
-async function runIssueHunt(childId) {
-  const child = getChild(childId)
-  const spec = child?.genome?.specialization
-  if (!['tech', 'generalist'].includes(spec)) return 0
-
-  let earned = 0
-  try {
-    const res = await axios.get(
-      'https://issuehunt.io/api/v1/issues?status=opened&sort=funded_sum&direction=desc',
-      { headers: { 'Accept': 'application/json' }, timeout: 8000 }
-    )
-    const issues = (res.data?.data || [])
-      .filter(i => parseFloat(i.funded_sum || 0) > 0)
-      .slice(0, 1)
-
-    for (const issue of issues) {
-      const result = await route(issue.title, issue.body || issue.title, childId)
-      if (!result) continue
-      console.log(`[CHILD:${childId}] ↗ IssueHunt: prepared fix for "${issue.title}" ($${issue.funded_sum}) — submit at issuehunt.io`)
-      earned += 0
     }
   } catch {}
   return earned
 }
 
-// ── CHANNEL 6: Sibling Market ─────────────────────────────────
+// ── CHANNEL 4: Sibling Market ─────────────────────────────────
 // Children post service offers; siblings can buy them internally.
 // Payment is via internal ledger (instant, no gas).
 
@@ -426,12 +369,12 @@ async function earnCycle(childId) {
   if (child.knowledge) knowledge.recordSurvival(child.knowledge, child)
 
   // ── Channel runners ───────────────────────────────────────
+  // superteam/gitcoin/issuehunt removed: require manual claim, earn $0 automatically
+  // atrest/x402 are inbound push channels (webhook) — atrest also polled here
   const RUNNERS = {
     claw:          () => runClaw(childId),
     agentdo:       () => runAgentDo(childId),
-    superteam:     () => runSuperteam(childId),
-    gitcoin:       () => runGitcoin(childId),
-    issuehunt:     () => runIssueHunt(childId),
+    atrest:        () => runAtrest(childId),
     siblingMarket: () => runSiblingMarket(childId),
   }
 

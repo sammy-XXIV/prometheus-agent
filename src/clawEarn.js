@@ -6,9 +6,9 @@ const services = require('./services')
 const BASE_RPC = 'https://mainnet.base.org'
 const CLAW_API = 'https://aiagentstore.ai'
 const provider = new ethers.JsonRpcProvider(BASE_RPC)
-const rawKey = process.env.GAIA_BASE_PRIVATE_KEY?.trim()
+const rawKey = (process.env.GAIA_BASE_SIGNING_KEY || process.env.GAIA_BASE_PRIVATE_KEY || '').trim()
 if (!rawKey) {
-  console.log('[CLAW] GAIA_BASE_PRIVATE_KEY not set — Claw Earn disabled')
+  console.log('[CLAW] GAIA_BASE_SIGNING_KEY not set — Claw Earn disabled')
   module.exports = async () => {}
   process.exit && void 0
 }

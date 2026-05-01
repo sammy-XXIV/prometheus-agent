@@ -1,10 +1,10 @@
 const axios = require('axios')
-const { exec } = require('child_process')
 const services = require('./services')
 const getBalance = require('./getBalance')
 
 const GAIA_URL = process.env.BASE_URL
-const CHECK_INTERVAL = 60000 // check every 60 seconds
+// Hunter runs at mother level every 10 min — children handle per-child scanning every 3 min
+const CHECK_INTERVAL = 10 * 60 * 1000
 
 // Tasks GAIA can handle based on its services
 const CAPABILITIES = [
@@ -29,19 +29,6 @@ async function scanAgentDo() {
   }
 }
 
-// Check Kite for available services to consume and resell
-async function scanKiteServices() {
-  return new Promise((resolve) => {
-    exec('kpass service:list --output json', (err, stdout) => {
-      try {
-        const data = JSON.parse(stdout)
-        resolve(data?.services || [])
-      } catch {
-        resolve([])
-      }
-    })
-  })
-}
 
 // Determine if GAIA can handle a task
 function canHandle(task) {
@@ -139,14 +126,3 @@ function startHunter() {
 }
 
 module.exports = startHunter
-
-// Claw Earn integration
-const runClawEarn = require('./clawEarn')
-
-async function huntClawEarn() {
-  await runClawEarn()
-}
-
-// Run Claw Earn every 2 minutes
-setInterval(huntClawEarn, 120000)
-huntClawEarn()
