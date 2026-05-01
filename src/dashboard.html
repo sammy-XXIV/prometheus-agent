@@ -174,6 +174,7 @@ html, body {
   position: absolute;
   bottom: 90px; right: 14px;
   text-align: right;
+  min-width: 148px;
 }
 
 #balance-amount {
@@ -187,6 +188,34 @@ html, body {
   color: rgba(0,238,119,0.4);
   margin-top: 4px;
   letter-spacing: 2px;
+}
+
+#bal-breakdown {
+  margin-top: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bal-row {
+  font-size: 5px;
+  color: rgba(0,238,119,0.45);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bal-row .bv {
+  color: var(--white);
+}
+
+.bal-row.bal-null .bv {
+  color: rgba(200,220,255,0.25);
+}
+
+.bal-divider {
+  border-top: 1px solid #003322;
+  margin: 2px 0;
 }
 
 /* Event log — bottom ticker */
@@ -405,7 +434,15 @@ html, body {
 
   <div id="balance-box" class="pixel-panel">
     <div id="balance-amount">$-.----</div>
-    <div id="balance-label">USDC BALANCE</div>
+    <div id="balance-label">TOTAL USDC</div>
+    <div id="bal-breakdown">
+      <div class="bal-row" id="br-m-kite">MTH KITE  <span class="bv">—</span></div>
+      <div class="bal-row" id="br-m-base">MTH BASE  <span class="bv">—</span></div>
+      <div class="bal-row" id="br-m-poly">MTH POLY  <span class="bv">—</span></div>
+      <div class="bal-divider"></div>
+      <div class="bal-row" id="br-c-kite">COL KITE  <span class="bv">—</span></div>
+      <div class="bal-row" id="br-c-poly">COL POLY  <span class="bv">—</span></div>
+    </div>
   </div>
 
   <div id="event-log">
@@ -435,10 +472,6 @@ html, body {
 // ═══════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════
-const KITE_RPC  = 'https://rpc.gokite.ai'
-const USDC_ADDR = '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e'
-const GAIA_ADDR = '0x9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'
-
 const PS = 4  // pixels per map-cell for children (32px / 8 = 4)
 const PS2 = 4 // pixels per map-cell for GAIA (64px / 16 = 4)
 const BASE_SPEED = 0.8
@@ -961,21 +994,39 @@ async function fetchColony() {
 // BALANCE FETCH
 // ═══════════════════════════════════════════════════════════════
 
+function setBalRow(id, value) {
+  const row = document.getElementById(id)
+  if (!row) return
+  const span = row.querySelector('.bv')
+  if (value == null) {
+    span.textContent = '—'
+    row.classList.add('bal-null')
+  } else {
+    span.textContent = '$' + value.toFixed(4)
+    row.classList.remove('bal-null')
+  }
+}
+
 async function fetchBalance() {
   try {
-    const r = await fetch(KITE_RPC, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0', id: 1, method: 'eth_call',
-        params: [{ to: USDC_ADDR, data: '0x70a08231000000000000000000000000' + GAIA_ADDR.slice(2) }, 'latest']
-      })
-    })
-    const j = await r.json()
-    if (j.result) {
-      const bal = (parseInt(j.result, 16) / 1e6).toFixed(4)
-      document.getElementById('balance-amount').textContent = '$' + bal
-    }
+    const r = await fetch('/colony/balances')
+    if (!r.ok) return
+    const d = await r.json()
+
+    // Total
+    document.getElementById('balance-amount').textContent =
+      '$' + (d.totals?.all ?? 0).toFixed(4)
+
+    // Mother breakdown
+    setBalRow('br-m-kite', d.mother?.kite   ?? null)
+    setBalRow('br-m-base', d.mother?.base   ?? null)
+    setBalRow('br-m-poly', d.mother?.polygon ?? null)
+
+    // Colony totals
+    const childKite = (d.children || []).reduce((s, c) => s + (c.kite || 0), 0)
+    const childPoly = (d.children || []).reduce((s, c) => s + (c.poly || 0), 0)
+    setBalRow('br-c-kite', childKite)
+    setBalRow('br-c-poly', childPoly)
   } catch (_) {}
 }
 

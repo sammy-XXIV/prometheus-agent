@@ -289,6 +289,94 @@ app.get('/colony/fossils', (req, res) => {
   }
 })
 
+// Multi-chain balance snapshot — mother + all alive children across Kite/Base/Polygon
+let _balanceCache = null
+let _balanceCacheAt = 0
+const BALANCE_CACHE_MS = 25000  // serve cached result if < 25s old
+
+app.get('/colony/balances', async (req, res) => {
+  try {
+    if (_balanceCache && Date.now() - _balanceCacheAt < BALANCE_CACHE_MS) {
+      return res.json(_balanceCache)
+    }
+
+    const { colony } = require('./gaia')
+    const { kiteProvider, baseProvider, polygonProvider } = require('./rpcProvider')
+    const { deriveChildAddress, KITE_USDC, BASE_USDC, MOTHER_ADDRESS } = require('./childWallet')
+    const { ethers } = require('ethers')
+
+    const ERC20_ABI = ['function balanceOf(address) view returns (uint256)']
+    const POLY_USDC   = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
+    const POLY_USDC_E = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
+
+    async function bal(provider, token, address) {
+      try {
+        const c = new ethers.Contract(token, ERC20_ABI, provider)
+        const raw = await Promise.race([
+          c.balanceOf(address),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))
+        ])
+        return parseFloat(ethers.formatUnits(raw, 6))
+      } catch { return null }
+    }
+
+    // Base/Polygon mother address (EOA from GAIA_BASE_SIGNING_KEY)
+    let baseAddr = null
+    const sigKey = (process.env.GAIA_BASE_SIGNING_KEY || '').trim()
+    if (sigKey) {
+      try { baseAddr = new ethers.Wallet(sigKey).address } catch {}
+    }
+
+    // Alive children
+    const alive = colony.children.filter(c => c.status === 'alive')
+
+    // Query mother wallets + all child wallets in parallel
+    const [kiteM, baseM, polyM] = await Promise.all([
+      bal(kiteProvider, KITE_USDC, MOTHER_ADDRESS),
+      baseAddr ? bal(baseProvider, BASE_USDC, baseAddr) : Promise.resolve(null),
+      baseAddr
+        ? bal(polygonProvider, POLY_USDC, baseAddr).then(b =>
+            b > 0 ? b : bal(polygonProvider, POLY_USDC_E, baseAddr))
+        : Promise.resolve(null),
+    ])
+
+    const childBalances = await Promise.all(alive.map(async child => {
+      const kiteAddr = child.walletAddress || deriveChildAddress(child.id)
+      let polyAddr = null
+      if (sigKey) {
+        try { polyAddr = new ethers.Wallet(ethers.id(sigKey + ':child:' + child.id)).address } catch {}
+      }
+      const [kite, poly] = await Promise.all([
+        bal(kiteProvider, KITE_USDC, kiteAddr),
+        polyAddr
+          ? bal(polygonProvider, POLY_USDC, polyAddr).then(b =>
+              b > 0 ? b : bal(polygonProvider, POLY_USDC_E, polyAddr))
+          : Promise.resolve(null),
+      ])
+      return { id: child.id, kiteAddr, polyAddr, kite, poly }
+    }))
+
+    const childKite = childBalances.reduce((s, c) => s + (c.kite || 0), 0)
+    const childPoly = childBalances.reduce((s, c) => s + (c.poly || 0), 0)
+
+    _balanceCache = {
+      mother:   { address: MOTHER_ADDRESS, baseAddress: baseAddr, kite: kiteM, base: baseM, polygon: polyM },
+      children: childBalances,
+      totals: {
+        kite:    parseFloat(((kiteM || 0) + childKite).toFixed(6)),
+        base:    parseFloat((baseM || 0).toFixed(6)),
+        polygon: parseFloat(((polyM || 0) + childPoly).toFixed(6)),
+        all:     parseFloat(((kiteM || 0) + (baseM || 0) + (polyM || 0) + childKite + childPoly).toFixed(6)),
+      },
+      cachedAt: Date.now(),
+    }
+    _balanceCacheAt = Date.now()
+    res.json(_balanceCache)
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // Dashboard
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, '../src/dashboard.html'))
