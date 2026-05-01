@@ -409,6 +409,14 @@ async function earnCycle(childId) {
     credit(childId, total, topCh, `cycle +$${total.toFixed(4)}`)
   }
 
+  // Polymarket — run per child per cycle; earnings arrive async via checkResolutions.
+  // Tracked separately via knowledge.updatePolymarketKnowledge, not recordChannel
+  // (recordChannel would see $0 every cycle and incorrectly drive the weight to zero).
+  try {
+    const polymarket = require('./polymarket')
+    await polymarket.runForChild(child)
+  } catch {}
+
   // Request more funds if balance is critically low in survival mode
   if (isSurvival) {
     const bal = await getUSDCBalance(earner.walletAddress, 'kite').catch(() => 0)
