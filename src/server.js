@@ -309,30 +309,39 @@ app.get('/colony/balances', async (req, res) => {
     const POLY_USDC    = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
     const POLY_USDC_E  = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
     const POLY_RPCS    = [
-      process.env.POLYGON_RPC || 'https://polygon-rpc.com',
-      'https://polygon.llamarpc.com',
-      'https://rpc-mainnet.maticvigil.com',
-    ]
+      process.env.POLYGON_RPC,
+      'https://polygon-bor-rpc.publicnode.com',
+      'https://1rpc.io/matic',
+      'https://polygon.meowrpc.com',
+      'https://polygon.drpc.org',
+    ].filter(Boolean)
 
     async function bal(provider, token, address) {
       try {
         const c = new ethers.Contract(token, ERC20_ABI, provider)
         const raw = await Promise.race([
           c.balanceOf(address),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000))
         ])
         return parseFloat(ethers.formatUnits(raw, 6))
       } catch { return null }
     }
 
-    // Try each Polygon RPC in sequence, return first non-null result
+    // Race all Polygon RPCs in parallel — first non-null result wins
     async function polyBal(token, address) {
-      for (const rpc of POLY_RPCS) {
-        const p = new ethers.JsonRpcProvider(rpc, { chainId: 137, name: 'polygon' }, { staticNetwork: true })
-        const v = await bal(p, token, address)
-        if (v !== null) return v
-      }
-      return null
+      return new Promise(resolve => {
+        let settled = false
+        let pending = POLY_RPCS.length
+        for (const rpc of POLY_RPCS) {
+          const p = new ethers.JsonRpcProvider(rpc, { chainId: 137, name: 'polygon' }, { staticNetwork: true })
+          bal(p, token, address).then(v => {
+            pending--
+            if (!settled && v !== null) { settled = true; resolve(v) }
+            else if (pending === 0 && !settled) resolve(null)
+          })
+        }
+        if (POLY_RPCS.length === 0) resolve(null)
+      })
     }
 
     // Sum USDC + USDC.e on Polygon for a given address
