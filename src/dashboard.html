@@ -1018,9 +1018,15 @@ async function fetchBalance() {
       '$' + (d.totals?.all ?? 0).toFixed(4)
 
     // Mother breakdown
-    setBalRow('br-m-kite', d.mother?.kite   ?? null)
-    setBalRow('br-m-base', d.mother?.base   ?? null)
+    setBalRow('br-m-kite', d.mother?.kite    ?? null)
+    setBalRow('br-m-base', d.mother?.base    ?? null)
     setBalRow('br-m-poly', d.mother?.polygon ?? null)
+
+    // Show NO KEY hint if signing key missing
+    if (!d.mother?.hasSigningKey) {
+      const row = document.getElementById('br-m-poly')
+      if (row) row.querySelector('.bv').textContent = 'NO KEY'
+    }
 
     // Colony totals
     const childKite = (d.children || []).reduce((s, c) => s + (c.kite || 0), 0)

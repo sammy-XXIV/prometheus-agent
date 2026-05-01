@@ -301,23 +301,48 @@ app.get('/colony/balances', async (req, res) => {
     }
 
     const { colony } = require('./gaia')
-    const { kiteProvider, baseProvider, polygonProvider } = require('./rpcProvider')
+    const { kiteProvider, baseProvider } = require('./rpcProvider')
     const { deriveChildAddress, KITE_USDC, BASE_USDC, MOTHER_ADDRESS } = require('./childWallet')
     const { ethers } = require('ethers')
 
     const ERC20_ABI = ['function balanceOf(address) view returns (uint256)']
-    const POLY_USDC   = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
-    const POLY_USDC_E = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
+    const POLY_USDC    = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
+    const POLY_USDC_E  = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
+    const POLY_RPCS    = [
+      process.env.POLYGON_RPC || 'https://polygon-rpc.com',
+      'https://polygon.llamarpc.com',
+      'https://rpc-mainnet.maticvigil.com',
+    ]
 
     async function bal(provider, token, address) {
       try {
         const c = new ethers.Contract(token, ERC20_ABI, provider)
         const raw = await Promise.race([
           c.balanceOf(address),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))
         ])
         return parseFloat(ethers.formatUnits(raw, 6))
       } catch { return null }
+    }
+
+    // Try each Polygon RPC in sequence, return first non-null result
+    async function polyBal(token, address) {
+      for (const rpc of POLY_RPCS) {
+        const p = new ethers.JsonRpcProvider(rpc, { chainId: 137, name: 'polygon' }, { staticNetwork: true })
+        const v = await bal(p, token, address)
+        if (v !== null) return v
+      }
+      return null
+    }
+
+    // Sum USDC + USDC.e on Polygon for a given address
+    async function polyUSDC(address) {
+      const [native, bridged] = await Promise.all([
+        polyBal(POLY_USDC, address),
+        polyBal(POLY_USDC_E, address),
+      ])
+      const total = (native || 0) + (bridged || 0)
+      return total > 0 ? total : (native ?? bridged)
     }
 
     // Base/Polygon mother address (EOA from GAIA_BASE_SIGNING_KEY)
@@ -334,10 +359,7 @@ app.get('/colony/balances', async (req, res) => {
     const [kiteM, baseM, polyM] = await Promise.all([
       bal(kiteProvider, KITE_USDC, MOTHER_ADDRESS),
       baseAddr ? bal(baseProvider, BASE_USDC, baseAddr) : Promise.resolve(null),
-      baseAddr
-        ? bal(polygonProvider, POLY_USDC, baseAddr).then(b =>
-            b > 0 ? b : bal(polygonProvider, POLY_USDC_E, baseAddr))
-        : Promise.resolve(null),
+      baseAddr ? polyUSDC(baseAddr) : Promise.resolve(null),
     ])
 
     const childBalances = await Promise.all(alive.map(async child => {
@@ -348,10 +370,7 @@ app.get('/colony/balances', async (req, res) => {
       }
       const [kite, poly] = await Promise.all([
         bal(kiteProvider, KITE_USDC, kiteAddr),
-        polyAddr
-          ? bal(polygonProvider, POLY_USDC, polyAddr).then(b =>
-              b > 0 ? b : bal(polygonProvider, POLY_USDC_E, polyAddr))
-          : Promise.resolve(null),
+        polyAddr ? polyUSDC(polyAddr) : Promise.resolve(null),
       ])
       return { id: child.id, kiteAddr, polyAddr, kite, poly }
     }))
@@ -360,7 +379,7 @@ app.get('/colony/balances', async (req, res) => {
     const childPoly = childBalances.reduce((s, c) => s + (c.poly || 0), 0)
 
     _balanceCache = {
-      mother:   { address: MOTHER_ADDRESS, baseAddress: baseAddr, kite: kiteM, base: baseM, polygon: polyM },
+      mother:   { address: MOTHER_ADDRESS, baseAddress: baseAddr, hasSigningKey: !!sigKey, kite: kiteM, base: baseM, polygon: polyM },
       children: childBalances,
       totals: {
         kite:    parseFloat(((kiteM || 0) + childKite).toFixed(6)),
