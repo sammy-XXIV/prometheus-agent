@@ -353,6 +353,9 @@ async function run() {
   const { startAtrest } = require('./atrest')
   startAtrest()
 
+  const polymarket = require('./polymarket')
+  polymarket.start(colony, onChildEarning)
+
   let balance = await getBalance()
   memory.lastBalance = balance
   let mode = await think(balance)

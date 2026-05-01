@@ -256,6 +256,25 @@ app.get('/colony/market', (req, res) => {
   }
 })
 
+// Polymarket positions — open bets and resolved P&L
+app.get('/colony/polymarket', (req, res) => {
+  try {
+    const poly  = require('./polymarket')
+    const all   = Object.values(poly.getPositions())
+    const open  = all.filter(p => !p.resolved)
+    const won   = all.filter(p => p.resolved && p.outcome === 'WIN')
+    const lost  = all.filter(p => p.resolved && p.outcome === 'LOSS')
+    const totalPnL = all.filter(p => p.resolved).reduce((s, p) => s + (p.pnl || 0), 0)
+    res.json({
+      summary: { open: open.length, won: won.length, lost: lost.length, totalPnL: parseFloat(totalPnL.toFixed(4)) },
+      openPositions:     open,
+      recentResolved:    all.filter(p => p.resolved).slice(-20),
+    })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // Fossil graveyard — permanent record of all deceased children
 app.get('/colony/fossils', (req, res) => {
   try {

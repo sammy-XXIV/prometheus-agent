@@ -81,7 +81,25 @@ function create(parentKnowledge = null) {
     topTask:         null,
     finalFitness:    null,
     lifetimeEarned:  0,
+    polymarket:      freshPolymarketKnowledge(),
   }
+}
+
+const PM_CATEGORIES = ['crypto', 'politics', 'economics', 'sports', 'tech', 'geopolitics', 'other']
+
+function freshPolymarketKnowledge() {
+  const pm = {
+    categoryPerformance: {},
+    categoryWeights:     {},
+    totalBets:           0,
+    totalWins:           0,
+    totalPnL:            0,
+  }
+  for (const cat of PM_CATEGORIES) {
+    pm.categoryPerformance[cat] = { bets: 0, wins: 0, losses: 0, totalPnL: 0 }
+    pm.categoryWeights[cat]     = 1.0
+  }
+  return pm
 }
 
 // Inherit from parent with gaussian mutation.
@@ -125,6 +143,19 @@ function inherit(parent) {
   // Carry hints forward as warm-start signals
   child.topChannel = parent.topChannel || null
   child.topTask    = parent.topTask    || null
+
+  // Inherit Polymarket category weights with gaussian mutation
+  if (parent.polymarket) {
+    const pp = parent.polymarket
+    const cp = child.polymarket
+    for (const cat of PM_CATEGORIES) {
+      const stats   = pp.categoryPerformance?.[cat] || {}
+      const winRate = stats.wins / Math.max(stats.bets, 1)
+      const sigma   = winRate >= 0.55 ? 0.15 : 0.45
+      const pw      = pp.categoryWeights?.[cat] ?? 1.0
+      cp.categoryWeights[cat] = clamp(pw * (1 + gaussian() * sigma), 0.1, 3.0)
+    }
+  }
 
   return child
 }
@@ -237,6 +268,33 @@ function recordSurvival(knowledge, child) {
   if (child.emergencyFundingRequested) sk.emergencyRequestsMade++
 }
 
+// ── Polymarket knowledge helpers ──────────────────────────────
+
+function initPolymarketKnowledge(knowledge) {
+  if (!knowledge.polymarket) knowledge.polymarket = freshPolymarketKnowledge()
+  return knowledge.polymarket
+}
+
+// Called by polymarket.js when a position resolves.
+function updatePolymarketKnowledge(knowledge, position, won, pnl) {
+  const pm  = initPolymarketKnowledge(knowledge)
+  const cat = position.category || 'other'
+  if (!pm.categoryPerformance[cat]) pm.categoryPerformance[cat] = { bets: 0, wins: 0, losses: 0, totalPnL: 0 }
+
+  const c = pm.categoryPerformance[cat]
+  c.bets++
+  c.totalPnL += pnl
+  if (won) c.wins++; else c.losses++
+
+  pm.totalBets++
+  pm.totalPnL += pnl
+  if (won) pm.totalWins++
+
+  // Update category weight based on running win rate
+  const winRate = c.wins / Math.max(c.bets, 1)
+  pm.categoryWeights[cat] = clamp(winRate * 2.0, 0.1, 2.5)
+}
+
 // Summarize the genome for logging / dashboard display
 function summary(knowledge) {
   if (!knowledge) return '(no knowledge genome)'
@@ -262,7 +320,10 @@ module.exports = {
   recordChannel,
   recordTask,
   recordSurvival,
+  initPolymarketKnowledge,
+  updatePolymarketKnowledge,
   summary,
   CHANNELS,
   TASK_TYPES,
+  PM_CATEGORIES,
 }
