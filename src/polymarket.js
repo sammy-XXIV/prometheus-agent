@@ -33,7 +33,6 @@ const crypto     = require('crypto')
 
 const GAMMA_API        = 'https://gamma-api.polymarket.com'
 const CLOB_HOST        = 'https://clob.polymarket.com'
-const POLYGON_RPC      = process.env.POLYGON_RPC || 'https://polygon-rpc.com'
 const POLYGON_CHAIN    = 137
 const CTF_EXCHANGE     = '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E'
 const NEG_RISK_ADAPTER = '0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296'
@@ -91,7 +90,7 @@ let childCreds = {}   // childId → { apiKey, secret, passphrase }
 const approvedWallets  = new Set()   // addresses already approved CTF Exchange
 const fundedChildren   = new Set()   // childIds already seeded on Polygon
 
-const polygonProvider  = new ethers.JsonRpcProvider(POLYGON_RPC)
+const { polygonProvider, throttledLog } = require('./rpcProvider')
 const anthropic        = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 // ── Persistence ───────────────────────────────────────────────
@@ -160,7 +159,10 @@ async function getPolyUSDCBalance(address) {
     const usdce = new ethers.Contract(POLY_USDC_E, ERC20_ABI, polygonProvider)
     const rawE  = await usdce.balanceOf(address)
     return parseFloat(ethers.formatUnits(rawE, 6))
-  } catch { return 0 }
+  } catch (e) {
+    throttledLog('poly:balance', `[POLY] Polygon RPC error (retrying in 30s): ${e.message}`)
+    return 0
+  }
 }
 
 // ── Mother funds child on Polygon ─────────────────────────────
@@ -186,7 +188,7 @@ async function fundChildPoly(childId, childAddress) {
     } else {
       console.log(`[POLY] Mother low on MATIC (${ethers.formatEther(maticBal)}) — skipping gas seed`)
     }
-  } catch (e) { console.log(`[POLY] MATIC seed failed: ${e.message}`) }
+  } catch (e) { throttledLog('poly:matic-seed', `[POLY] MATIC seed failed: ${e.message}`) }
 
   // Send USDC
   try {
@@ -199,9 +201,9 @@ async function fundChildPoly(childId, childAddress) {
       console.log(`[POLY] ✓ $${CHILD_POLY_SEED} USDC → ${childId}`)
       fundedChildren.add(childId)
     } else {
-      console.log(`[POLY] Mother has $${ethers.formatUnits(bal, 6)} USDC on Polygon (need $${CHILD_POLY_SEED})`)
+      throttledLog('poly:usdc-low', `[POLY] Mother has $${ethers.formatUnits(bal, 6)} USDC on Polygon (need $${CHILD_POLY_SEED})`)
     }
-  } catch (e) { console.log(`[POLY] USDC seed failed: ${e.message}`) }
+  } catch (e) { throttledLog('poly:usdc-seed', `[POLY] USDC seed failed: ${e.message}`) }
 }
 
 // ── CLOB credential creation ──────────────────────────────────
@@ -523,13 +525,13 @@ Only BET_YES/BET_NO if ALL true: (1) probability differs >15pp from market, (2) 
 
   try {
     const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 180,
       messages: [{ role: 'user', content: prompt }],
     })
     return parseAnalysis(msg.content[0]?.text || '', yesPrice, noPrice, category)
   } catch (e) {
-    console.log('[POLY] Claude error:', e.message)
+    throttledLog('poly:claude', `[POLY] Claude error (retrying in 30s): ${e.message}`)
     return null
   }
 }

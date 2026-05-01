@@ -1,7 +1,6 @@
 const { ethers } = require('ethers')
 require('dotenv').config()
-
-const provider = new ethers.JsonRpcProvider('https://rpc.gokite.ai/')
+const { kiteProvider: provider } = require('./rpcProvider')
 
 const ERC20_ABI = [
   'event Transfer(address indexed from, address indexed to, uint256 value)'
