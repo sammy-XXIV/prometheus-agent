@@ -10,7 +10,7 @@ const { ethers } = require('ethers')
 
 const KITE_RPC    = 'https://rpc.gokite.ai/'
 const BASE_RPC    = 'https://mainnet.base.org'
-const POLYGON_RPC = process.env.POLYGON_RPC || 'https://polygon-rpc.com'
+const POLYGON_RPC = process.env.POLYGON_RPC || 'https://polygon-bor-rpc.publicnode.com'
 
 // Throttle: one log line per error key per 30 seconds
 const _lastLogged = {}

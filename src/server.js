@@ -311,8 +311,8 @@ app.get('/colony/balances', async (req, res) => {
     const POLY_RPCS    = [
       process.env.POLYGON_RPC,
       'https://polygon-bor-rpc.publicnode.com',
-      'https://1rpc.io/matic',
       'https://polygon.meowrpc.com',
+      'https://1rpc.io/matic',
       'https://polygon.drpc.org',
     ].filter(Boolean)
 
