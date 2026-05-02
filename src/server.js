@@ -517,6 +517,59 @@ app.post('/news',           paymentWall('news'),            async (req, res) => 
 app.post('/sentiment',      paymentWall('sentiment'),       async (req, res) => { try { res.json({ result: await services.sentiment(req.body.text) }) } catch(e) { res.status(500).json({ error: e.message }) }})
 app.post('/advice',         paymentWall('advice'),          async (req, res) => { try { res.json({ result: await services.advice(req.body.topic) }) } catch(e) { res.status(500).json({ error: e.message }) }})
 
+// ── Polygon sweep — drain all children's Polygon USDC to mother ──────────────
+// Protected by SWEEP_SECRET env var. Call: POST /sweep-polygon {"secret":"..."}
+app.post('/sweep-polygon', async (req, res) => {
+  const secret = (process.env.SWEEP_SECRET || '').trim()
+  if (!secret || req.body.secret !== secret) {
+    return res.status(401).json({ error: 'Unauthorized — set SWEEP_SECRET env var' })
+  }
+
+  const signingKey = (process.env.GAIA_BASE_SIGNING_KEY || '').trim()
+  if (!signingKey) {
+    return res.status(500).json({ error: 'GAIA_BASE_SIGNING_KEY not set — cannot sign transfers' })
+  }
+
+  const { ethers } = require('ethers')
+  const { polygonProvider } = require('./rpcProvider')
+  const POLY_USDC   = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
+  const POLY_USDC_E = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
+  const MOTHER      = config.walletAddress
+  const ERC20       = ['function balanceOf(address) view returns (uint256)', 'function transfer(address,uint256) returns (bool)']
+
+  let colony
+  try { colony = require('./gaia').colony } catch { return res.status(500).json({ error: 'Colony not running' }) }
+
+  const children = (colony.children || []).filter(c => c.status === 'alive' || c.status === 'deceased')
+  const results  = []
+  let grandTotal = 0
+
+  for (const child of children) {
+    const derived  = ethers.id(signingKey + ':child:' + child.id)
+    const wallet   = new ethers.Wallet(derived, polygonProvider)
+    const childRow = { childId: child.id, address: wallet.address, swept: {} }
+
+    for (const [label, token] of [['USDC', POLY_USDC], ['USDC.e', POLY_USDC_E]]) {
+      try {
+        const contract = new ethers.Contract(token, ERC20, wallet)
+        const bal = await contract.balanceOf(wallet.address)
+        const balFloat = parseFloat(ethers.formatUnits(bal, 6))
+        if (balFloat < 0.001) { childRow.swept[label] = 0; continue }
+        const tx = await contract.transfer(MOTHER, bal, { gasLimit: 100_000n })
+        await tx.wait()
+        childRow.swept[label] = balFloat
+        grandTotal += balFloat
+        console.log(`[SWEEP] ${child.id} ${label} $${balFloat.toFixed(4)} → mother tx:${tx.hash}`)
+      } catch (e) {
+        childRow.swept[label] = `error: ${e.message}`
+      }
+    }
+    results.push(childRow)
+  }
+
+  res.json({ ok: true, grandTotal: grandTotal.toFixed(4), children: results })
+})
+
 app.listen(config.port, () => {
   console.log(`GAIA serving ${Object.keys(config.services).length} services on port ${config.port}`)
 })
