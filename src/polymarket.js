@@ -43,13 +43,15 @@ const MIN_BET          = 0.10
 const MAX_BET          = 0.50
 const KELLY_FRACTION   = 0.02
 const MAX_EXPOSURE     = 0.20
-const MIN_EDGE         = 0.15
+const MIN_EDGE         = 0.08
 const CHILD_POLY_SEED  = 1.00   // USDC to seed each child's Polygon wallet
 const CHILD_MATIC_SEED = '0.05' // MATIC for gas
 const MAX_MARKETS      = 8
 const SCAN_MS          = 60 * 60 * 1000
 const SURVIVAL_SCAN_MS = 15 * 60 * 1000
 const RESOLVE_MS       = 30 * 60 * 1000
+
+const PAPER_TRADING = process.env.PAPER_TRADING === 'true'
 
 const POSITIONS_PATH = path.join(__dirname, '../data/polymarket_positions.json')
 const CREDS_PATH     = path.join(__dirname, '../data/polymarket_creds.json')
@@ -382,7 +384,7 @@ async function fetchMarkets() {
       .filter(m => {
         const end = new Date(m.endDate || m.end_date_iso || 0).getTime()
         const hrs  = (end - now) / 3600000
-        return hrs > 0.5 && hrs <= 24 && parseFloat(m.volume || 0) > 100
+        return hrs > 0.5 && hrs <= 72 && parseFloat(m.volume || 0) > 100
       })
       .sort((a, b) => parseFloat(b.volume || 0) - parseFloat(a.volume || 0))
       .slice(0, MAX_MARKETS)
@@ -525,7 +527,7 @@ Only BET_YES/BET_NO if ALL true: (1) probability differs >15pp from market, (2) 
 
   try {
     const msg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 180,
       messages: [{ role: 'user', content: prompt }],
     })
@@ -662,7 +664,7 @@ async function runForChild(child) {
   for (const { market, analysis } of _markets) {
     if (!analysis) continue
     if (analysis.recommendation === 'SKIP') continue
-    if (analysis.confidence !== 'HIGH') continue
+    if (!['HIGH', 'MEDIUM'].includes(analysis.confidence)) continue
     if (Math.abs(analysis.edge) < MIN_EDGE) continue
 
     // Already have an open position on this market?
@@ -688,10 +690,15 @@ async function runForChild(child) {
       `\n[POLY]    wallet: ${wallet.address.slice(0, 10)}… (Polygon balance: $${polyBalance.toFixed(4)})`
     )
 
-    const result = await placeClobOrder(market, side, betSize, child.id)
+    let result
+    if (PAPER_TRADING) {
+      result = { ok: false, paper: true, reason: 'PAPER_TRADING mode — no real order sent' }
+    } else {
+      result = await placeClobOrder(market, side, betSize, child.id)
+    }
 
     if (!result.ok) {
-      console.log(`[POLY] 📝 Paper trade (${result.reason})`)
+      console.log(`[POLY] 📝 Paper trade — ${side} $${betSize.toFixed(2)} on "${market.question.slice(0, 50)}" (${result.reason})`)
     } else {
       console.log(`[POLY] ✅ Order filled | orderId: ${result.orderId}`)
     }

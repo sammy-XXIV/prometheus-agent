@@ -150,7 +150,8 @@ async function runClaw(childId) {
         }, { timeout: 10000 })
 
         if (prepRes.data?.transaction && !earner.wallet._addressOnly &&
-            typeof earner.wallet.connect === 'function') {
+            typeof earner.wallet.connect === 'function' &&
+            process.env.PAPER_TRADING !== 'true') {
           const bw = earner.wallet.connect(baseProvider)
           const tx = await bw.sendTransaction(prepRes.data.transaction)
           const receipt = await tx.wait()
@@ -352,7 +353,11 @@ async function requestFunds(childId, amountUSDC) {
 // ── Main earning loop per child ────────────────────────────────
 
 async function earnCycle(childId) {
-  if (process.env.PAUSE_EARNERS === 'true') return
+  if (process.env.PAUSE_EARNERS === 'true') {
+    const interval = EARN_INTERVAL_MS
+    setTimeout(() => earnCycle(childId), interval)
+    return
+  }
 
   const earner = earners.get(childId)
   if (!earner || !earner.running) return
