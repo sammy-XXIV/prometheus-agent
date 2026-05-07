@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GAIA // LOG IN</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+      image-rendering: pixelated; image-rendering: crisp-edges;
+    }
+    :root {
+      --bg: #0a0a1a;
+      --green: #00ee77;
+      --green-dim: rgba(0,238,119,0.4);
+      --green-dark: #003322;
+      --red: #ff3344;
+      --white: #ddeeff;
+      --font: 'Press Start 2P', monospace;
+    }
+    html, body {
+      width: 100%; min-height: 100%;
+      background: var(--bg);
+      color: var(--white);
+      font-family: var(--font);
+    }
+    #grid-bg {
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,238,119,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,238,119,0.04) 1px, transparent 1px);
+      background-size: 16px 16px;
+      z-index: 0; pointer-events: none;
+    }
+    #scanlines {
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 3px,
+        rgba(0,0,0,0.12) 3px, rgba(0,0,0,0.12) 4px
+      );
+      z-index: 100; pointer-events: none;
+    }
+    .scene {
+      position: relative; z-index: 10;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px 16px;
+    }
+    .title {
+      font-size: 18px;
+      color: var(--green);
+      text-shadow: 0 0 10px var(--green), 0 0 24px var(--green), 2px 2px 0 var(--green-dark);
+      letter-spacing: 6px;
+      margin-bottom: 6px;
+      text-align: center;
+    }
+    .subtitle {
+      font-size: 7px;
+      color: var(--green-dim);
+      letter-spacing: 3px;
+      margin-bottom: 36px;
+      text-align: center;
+    }
+    .pixel-panel {
+      background: rgba(4,4,14,0.95);
+      border: 2px solid var(--green);
+      box-shadow: 4px 4px 0 rgba(0,238,119,0.2);
+      padding: 28px 28px 24px;
+      width: 100%; max-width: 400px;
+    }
+    .field-label {
+      font-size: 6px; color: var(--green-dim);
+      letter-spacing: 2px; margin-bottom: 8px; display: block;
+    }
+    input {
+      width: 100%;
+      background: rgba(0,238,119,0.04);
+      border: 2px solid rgba(0,238,119,0.3);
+      color: var(--green);
+      font-family: var(--font); font-size: 9px;
+      padding: 10px 12px; margin-bottom: 22px;
+      outline: none; caret-color: var(--green);
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input::placeholder { color: rgba(0,238,119,0.2); }
+    input:focus { border-color: var(--green); box-shadow: 0 0 8px rgba(0,238,119,0.3); }
+    .pixel-btn {
+      width: 100%; background: var(--green); border: none;
+      color: #000; cursor: pointer; font-family: var(--font);
+      font-size: 9px; letter-spacing: 2px; padding: 12px;
+      box-shadow: 3px 3px 0 var(--green-dark);
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .pixel-btn:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--green-dark); }
+    .pixel-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--green-dark); }
+    .pixel-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .error-box {
+      background: rgba(255,51,68,0.08); border: 2px solid var(--red);
+      box-shadow: 2px 2px 0 rgba(255,51,68,0.2); color: var(--red);
+      font-size: 7px; line-height: 1.8; padding: 10px 12px;
+      margin-bottom: 18px; display: none;
+    }
+    .link-row { text-align: center; margin-top: 20px; font-size: 7px; color: var(--green-dim); }
+    .link-row a { color: var(--green); text-decoration: none; }
+    .link-row a:hover { text-shadow: 0 0 6px var(--green); }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .cursor { animation: blink 1s step-end infinite; }
+  </style>
+</head>
+<body>
+  <div id="grid-bg"></div>
+  <div id="scanlines"></div>
+
+  <div class="scene">
+    <div class="title">GAIA<span class="cursor">_</span></div>
+    <div class="subtitle">ACCESS YOUR COLONY</div>
+
+    <div class="pixel-panel">
+      <div class="error-box" id="error"></div>
+
+      <label class="field-label">EMAIL ADDRESS</label>
+      <input type="email" id="email" autocomplete="email">
+
+      <label class="field-label">PASSWORD</label>
+      <input type="password" id="password" autocomplete="current-password">
+
+      <button class="pixel-btn" id="btn" onclick="doLogin()">[ LOG IN ]</button>
+    </div>
+
+    <div class="link-row">
+      NO ACCOUNT? <a href="/signup">SIGN UP &gt;&gt;</a>
+    </div>
+  </div>
+
+  <script>
+    async function doLogin() {
+      const email    = document.getElementById('email').value.trim()
+      const password = document.getElementById('password').value
+      const btn      = document.getElementById('btn')
+      const errEl    = document.getElementById('error')
+
+      errEl.style.display = 'none'
+      btn.disabled = true
+      btn.textContent = '[ CONNECTING... ]'
+
+      try {
+        const res  = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+        const data = await res.json()
+
+        if (!res.ok) {
+          errEl.textContent   = '> ' + (data.error || 'LOGIN FAILED')
+          errEl.style.display = 'block'
+          btn.disabled        = false
+          btn.textContent     = '[ LOG IN ]'
+          return
+        }
+
+        localStorage.setItem('gaia_token', data.token)
+        localStorage.setItem('gaia_user',  JSON.stringify(data.user))
+        window.location.href = '/app'
+      } catch {
+        errEl.textContent   = '> NETWORK ERROR — TRY AGAIN'
+        errEl.style.display = 'block'
+        btn.disabled        = false
+        btn.textContent     = '[ LOG IN ]'
+      }
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin()
+    })
+  </script>
+</body>
+</html>

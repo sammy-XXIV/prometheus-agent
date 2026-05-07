@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GAIA // SIGN UP</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+      image-rendering: pixelated; image-rendering: crisp-edges;
+    }
+    :root {
+      --bg: #0a0a1a;
+      --green: #00ee77;
+      --green-dim: rgba(0,238,119,0.4);
+      --green-dark: #003322;
+      --red: #ff3344;
+      --white: #ddeeff;
+      --font: 'Press Start 2P', monospace;
+    }
+    html, body {
+      width: 100%; min-height: 100%;
+      background: var(--bg);
+      color: var(--white);
+      font-family: var(--font);
+    }
+    /* pixel grid */
+    #grid-bg {
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,238,119,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,238,119,0.04) 1px, transparent 1px);
+      background-size: 16px 16px;
+      z-index: 0; pointer-events: none;
+    }
+    /* CRT scanlines */
+    #scanlines {
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 3px,
+        rgba(0,0,0,0.12) 3px, rgba(0,0,0,0.12) 4px
+      );
+      z-index: 100; pointer-events: none;
+    }
+    .scene {
+      position: relative; z-index: 10;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px 16px;
+    }
+    .title {
+      font-size: 18px;
+      color: var(--green);
+      text-shadow: 0 0 10px var(--green), 0 0 24px var(--green), 2px 2px 0 var(--green-dark);
+      letter-spacing: 6px;
+      margin-bottom: 6px;
+      text-align: center;
+    }
+    .subtitle {
+      font-size: 7px;
+      color: var(--green-dim);
+      letter-spacing: 3px;
+      margin-bottom: 36px;
+      text-align: center;
+    }
+    .pixel-panel {
+      background: rgba(4,4,14,0.95);
+      border: 2px solid var(--green);
+      box-shadow: 4px 4px 0 rgba(0,238,119,0.2);
+      padding: 28px 28px 24px;
+      width: 100%; max-width: 400px;
+    }
+    .field-label {
+      font-size: 6px;
+      color: var(--green-dim);
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      display: block;
+    }
+    input {
+      width: 100%;
+      background: rgba(0,238,119,0.04);
+      border: 2px solid rgba(0,238,119,0.3);
+      color: var(--green);
+      font-family: var(--font);
+      font-size: 9px;
+      padding: 10px 12px;
+      margin-bottom: 22px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      caret-color: var(--green);
+    }
+    input::placeholder { color: rgba(0,238,119,0.2); }
+    input:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 8px rgba(0,238,119,0.3);
+    }
+    .pixel-btn {
+      width: 100%;
+      background: var(--green);
+      border: none;
+      color: #000;
+      cursor: pointer;
+      font-family: var(--font);
+      font-size: 9px;
+      letter-spacing: 2px;
+      padding: 12px;
+      box-shadow: 3px 3px 0 var(--green-dark);
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .pixel-btn:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--green-dark); }
+    .pixel-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--green-dark); }
+    .pixel-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .error-box {
+      background: rgba(255,51,68,0.08);
+      border: 2px solid var(--red);
+      box-shadow: 2px 2px 0 rgba(255,51,68,0.2);
+      color: var(--red);
+      font-size: 7px;
+      line-height: 1.8;
+      padding: 10px 12px;
+      margin-bottom: 18px;
+      display: none;
+    }
+    .success-box {
+      background: rgba(0,238,119,0.05);
+      border: 2px solid var(--green);
+      box-shadow: 3px 3px 0 rgba(0,238,119,0.2);
+      color: var(--white);
+      font-size: 7px;
+      line-height: 2;
+      padding: 16px;
+      margin-top: 4px;
+      display: none;
+    }
+    .wallet-display {
+      background: rgba(0,238,119,0.07);
+      border: 2px solid rgba(0,238,119,0.3);
+      color: var(--green);
+      font-size: 6px;
+      padding: 8px 10px;
+      margin: 10px 0;
+      word-break: break-all;
+      line-height: 1.8;
+      cursor: pointer;
+    }
+    .wallet-display:hover { background: rgba(0,238,119,0.12); }
+    .link-row {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 7px;
+      color: var(--green-dim);
+    }
+    .link-row a {
+      color: var(--green);
+      text-decoration: none;
+    }
+    .link-row a:hover { text-shadow: 0 0 6px var(--green); }
+    /* blinking cursor effect on title */
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .cursor { animation: blink 1s step-end infinite; }
+  </style>
+</head>
+<body>
+  <div id="grid-bg"></div>
+  <div id="scanlines"></div>
+
+  <div class="scene">
+    <div class="title">GAIA<span class="cursor">_</span></div>
+    <div class="subtitle">SPAWN YOUR COLONY</div>
+
+    <div class="pixel-panel">
+      <div id="form-wrap">
+        <div class="error-box" id="error"></div>
+
+        <label class="field-label">EMAIL ADDRESS</label>
+        <input type="email" id="email" placeholder="you@example.com" autocomplete="email">
+
+        <label class="field-label">PASSWORD</label>
+        <input type="password" id="password" placeholder="min 8 characters" autocomplete="new-password">
+
+        <button class="pixel-btn" id="btn" onclick="doSignup()">[ CREATE ACCOUNT ]</button>
+      </div>
+
+      <div class="success-box" id="success"></div>
+    </div>
+
+    <div class="link-row">
+      ALREADY HAVE AN ACCOUNT? <a href="/login">LOG IN &gt;&gt;</a>
+    </div>
+  </div>
+
+  <script>
+    async function doSignup() {
+      const email    = document.getElementById('email').value.trim()
+      const password = document.getElementById('password').value
+      const btn      = document.getElementById('btn')
+      const errEl    = document.getElementById('error')
+
+      errEl.style.display = 'none'
+      btn.disabled = true
+      btn.textContent = '[ INITIALIZING... ]'
+
+      try {
+        const res  = await fetch('/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+        const data = await res.json()
+
+        if (!res.ok) {
+          errEl.textContent   = '> ' + (data.error || 'SIGNUP FAILED')
+          errEl.style.display = 'block'
+          btn.disabled        = false
+          btn.textContent     = '[ CREATE ACCOUNT ]'
+          return
+        }
+
+        localStorage.setItem('gaia_token', data.token)
+        localStorage.setItem('gaia_user',  JSON.stringify(data.user))
+
+        document.getElementById('form-wrap').style.display = 'none'
+        const succ = document.getElementById('success')
+        succ.style.display = 'block'
+        succ.innerHTML = `
+          COLONY ACCOUNT CREATED.<br><br>
+          TO LAUNCH YOUR COLONY, DEPOSIT<br>
+          <span style="color:var(--green)">0.5+ MATIC</span> ON POLYGON (CHAIN 137) TO:<br>
+          <div class="wallet-display" onclick="copyAddr('${data.user.walletAddress}')" title="CLICK TO COPY">
+            ${data.user.walletAddress || 'WALLET UNAVAILABLE'}
+          </div>
+          COLONY WILL AUTO-LAUNCH ONCE<br>
+          DEPOSIT IS DETECTED.<br><br>
+          <a href="/app" style="color:var(--green)">&gt;&gt; OPEN DASHBOARD</a>
+        `
+      } catch {
+        errEl.textContent   = '> NETWORK ERROR — TRY AGAIN'
+        errEl.style.display = 'block'
+        btn.disabled        = false
+        btn.textContent     = '[ CREATE ACCOUNT ]'
+      }
+    }
+
+    function copyAddr(addr) {
+      navigator.clipboard.writeText(addr).catch(() => {})
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') doSignup()
+    })
+  </script>
+</body>
+</html>

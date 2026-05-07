@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GAIA // MY COLONY</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+      image-rendering: pixelated; image-rendering: crisp-edges;
+    }
+    :root {
+      --bg: #0a0a1a;
+      --green: #00ee77;
+      --green-dim: rgba(0,238,119,0.4);
+      --green-dark: #003322;
+      --amber: #ffaa00;
+      --red: #ff3344;
+      --blue: #4488ff;
+      --purple: #cc66ff;
+      --white: #ddeeff;
+      --font: 'Press Start 2P', monospace;
+    }
+    html, body {
+      width: 100%; min-height: 100%;
+      background: var(--bg);
+      color: var(--white);
+      font-family: var(--font);
+    }
+    #grid-bg {
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,238,119,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,238,119,0.04) 1px, transparent 1px);
+      background-size: 16px 16px;
+      z-index: 0; pointer-events: none;
+    }
+    #scanlines {
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 3px,
+        rgba(0,0,0,0.12) 3px, rgba(0,0,0,0.12) 4px
+      );
+      z-index: 100; pointer-events: none;
+    }
+    .page {
+      position: relative; z-index: 10;
+      padding: 20px 16px 40px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* header */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 2px solid rgba(0,238,119,0.2);
+      padding-bottom: 14px; margin-bottom: 24px;
+    }
+    .logo {
+      font-size: 14px; color: var(--green);
+      text-shadow: 0 0 8px var(--green), 2px 2px 0 var(--green-dark);
+      letter-spacing: 5px;
+    }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .user-tag { font-size: 6px; color: var(--green-dim); }
+    .logout-btn {
+      background: none; border: 2px solid rgba(0,238,119,0.3);
+      color: var(--green-dim); cursor: pointer; font-family: var(--font);
+      font-size: 6px; padding: 5px 8px; letter-spacing: 1px;
+    }
+    .logout-btn:hover { border-color: var(--green); color: var(--green); }
+
+    /* pixel panel */
+    .pixel-panel {
+      background: rgba(4,4,14,0.92);
+      border: 2px solid var(--green);
+      box-shadow: 3px 3px 0 rgba(0,238,119,0.2);
+      padding: 16px;
+      margin-bottom: 18px;
+    }
+    .panel-title {
+      font-size: 7px; color: var(--green);
+      letter-spacing: 3px; margin-bottom: 14px;
+      border-bottom: 1px solid rgba(0,238,119,0.15);
+      padding-bottom: 8px;
+    }
+
+    /* deposit screen */
+    .deposit-msg { font-size: 7px; color: var(--white); line-height: 2.2; }
+    .deposit-msg .hl { color: var(--green); }
+    .wallet-display {
+      background: rgba(0,238,119,0.05);
+      border: 2px solid rgba(0,238,119,0.25);
+      color: var(--green);
+      font-size: 6px; line-height: 1.8;
+      padding: 10px 12px; margin: 12px 0;
+      word-break: break-all; cursor: pointer;
+    }
+    .wallet-display:hover { background: rgba(0,238,119,0.1); }
+    .copy-hint { font-size: 6px; color: var(--green-dim); }
+
+    /* stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 10px; margin-bottom: 18px;
+    }
+    .stat-box {
+      background: rgba(4,4,14,0.92);
+      border: 2px solid rgba(0,238,119,0.25);
+      box-shadow: 2px 2px 0 rgba(0,238,119,0.1);
+      padding: 12px 14px;
+    }
+    .stat-lbl { font-size: 5px; color: var(--green-dim); letter-spacing: 1px; }
+    .stat-val { font-size: 16px; color: var(--green); margin-top: 6px;
+      text-shadow: 0 0 8px var(--green); }
+    .stat-val.amber { color: var(--amber); text-shadow: 0 0 8px var(--amber); }
+    .stat-val.red   { color: var(--red);   text-shadow: 0 0 8px var(--red); }
+
+    /* children */
+    .children-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 10px; margin-bottom: 18px;
+    }
+    .child-card {
+      background: rgba(4,4,14,0.92);
+      border: 2px solid rgba(0,238,119,0.25);
+      box-shadow: 2px 2px 0 rgba(0,238,119,0.1);
+      padding: 12px;
+      font-size: 6px;
+    }
+    .child-card.alive    { border-color: rgba(0,238,119,0.4); }
+    .child-card.terminated { border-color: rgba(255,51,68,0.3); opacity: 0.55; }
+    .child-card.reproduced { border-color: rgba(255,170,0,0.3); opacity: 0.7; }
+    .child-id {
+      font-size: 7px; color: var(--green);
+      margin-bottom: 10px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .child-row {
+      display: flex; justify-content: space-between;
+      color: var(--green-dim); margin-bottom: 4px; line-height: 1.6;
+    }
+    .child-row .cv { color: var(--white); }
+    .badge {
+      font-size: 5px; padding: 2px 5px; letter-spacing: 1px;
+      border: 1px solid;
+    }
+    .badge.alive      { color: var(--green); border-color: var(--green); }
+    .badge.terminated { color: var(--red);   border-color: var(--red); }
+    .badge.reproduced { color: var(--amber); border-color: var(--amber); }
+
+    /* events */
+    .events-list { max-height: 260px; overflow-y: auto; }
+    .event-row {
+      font-size: 6px; padding: 5px 0;
+      border-bottom: 1px solid rgba(0,238,119,0.06);
+      line-height: 1.8;
+    }
+    .event-row:last-child { border-bottom: none; }
+    .ev-time { color: rgba(0,238,119,0.3); margin-right: 8px; }
+    .ev-msg.success { color: var(--green); }
+    .ev-msg.danger  { color: var(--red); }
+    .ev-msg.warn    { color: var(--amber); }
+    .ev-msg.info    { color: var(--blue); }
+
+    /* loading */
+    #loading {
+      text-align: center; padding: 80px 20px;
+      font-size: 8px; color: var(--green-dim); letter-spacing: 3px;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .blink { animation: blink 1s step-end infinite; }
+  </style>
+</head>
+<body>
+  <div id="grid-bg"></div>
+  <div id="scanlines"></div>
+
+  <div class="page">
+    <header>
+      <div class="logo">GAIA</div>
+      <div class="header-right">
+        <div class="user-tag" id="user-tag"></div>
+        <button class="logout-btn" onclick="logout()">[LOGOUT]</button>
+      </div>
+    </header>
+
+    <div id="root"><div id="loading">CONNECTING TO COLONY<span class="blink">_</span></div></div>
+  </div>
+
+  <script>
+    const token = localStorage.getItem('gaia_token')
+    if (!token) window.location.href = '/login'
+
+    const user = JSON.parse(localStorage.getItem('gaia_user') || '{}')
+    document.getElementById('user-tag').textContent = user.email || ''
+
+    function logout() {
+      localStorage.removeItem('gaia_token')
+      localStorage.removeItem('gaia_user')
+      window.location.href = '/login'
+    }
+
+    function copyAddr(addr) {
+      navigator.clipboard.writeText(addr).catch(() => {})
+    }
+
+    function renderDeposit(data) {
+      return `
+        <div class="pixel-panel">
+          <div class="panel-title">&gt; AWAITING DEPOSIT</div>
+          <div class="deposit-msg">
+            TO SPAWN YOUR COLONY, SEND AT LEAST<br>
+            <span class="hl">0.5 MATIC</span> ON <span class="hl">POLYGON (CHAIN 137)</span><br>
+            TO YOUR COLONY WALLET:<br>
+            <div class="wallet-display" onclick="copyAddr('${data.walletAddress}')" title="CLICK TO COPY">
+              ${data.walletAddress || 'WALLET UNAVAILABLE'}
+            </div>
+            <span class="copy-hint">[CLICK ADDRESS TO COPY]</span><br><br>
+            COLONY WILL AUTO-LAUNCH ONCE<br>
+            DEPOSIT IS DETECTED.
+          </div>
+        </div>
+      `
+    }
+
+    function renderColony(data) {
+      const uptime = Math.floor((Date.now() - data.genesisTime) / 60000)
+
+      const stats = `
+        <div class="stats-grid">
+          <div class="stat-box"><div class="stat-lbl">ALIVE</div><div class="stat-val">${data.alive}</div></div>
+          <div class="stat-box"><div class="stat-lbl">GENERATION</div><div class="stat-val">${data.generation}</div></div>
+          <div class="stat-box"><div class="stat-lbl">TERMINATED</div><div class="stat-val red">${data.terminated}</div></div>
+          <div class="stat-box"><div class="stat-lbl">REPRODUCED</div><div class="stat-val amber">${data.reproduced}</div></div>
+          <div class="stat-box"><div class="stat-lbl">TOTAL EARNED</div><div class="stat-val">$${(data.totalEarned||0).toFixed(4)}</div></div>
+          <div class="stat-box"><div class="stat-lbl">UPTIME</div><div class="stat-val">${uptime}M</div></div>
+        </div>
+      `
+
+      const childCards = (data.children || []).map(c => `
+        <div class="child-card ${c.status}">
+          <div class="child-id">${c.id}</div>
+          <div class="child-row">STATUS <span class="cv"><span class="badge ${c.status}">${c.status.toUpperCase()}</span></span></div>
+          <div class="child-row">SPEC   <span class="cv">${(c.genome?.specialization || '—').toUpperCase()}</span></div>
+          <div class="child-row">GEN    <span class="cv">${c.generation}</span></div>
+          <div class="child-row">FIT    <span class="cv">${c.fitness}</span></div>
+          <div class="child-row">TIME   <span class="cv">${c.hoursRemaining}H</span></div>
+          <div class="child-row">EARNED <span class="cv">$${(c.totalEarned||0).toFixed(4)}</span></div>
+        </div>
+      `).join('') || '<div style="font-size:7px;color:var(--green-dim)">NO CHILDREN YET</div>'
+
+      const events = (data.events || []).map(e => `
+        <div class="event-row">
+          <span class="ev-time">${e.time}</span>
+          <span class="ev-msg ${e.type}">${e.msg}</span>
+        </div>
+      `).join('') || '<div class="event-row"><span class="ev-msg info">NO EVENTS YET</span></div>'
+
+      return `
+        ${stats}
+        <div class="pixel-panel">
+          <div class="panel-title">&gt; COLONY CHILDREN</div>
+          <div class="children-grid">${childCards}</div>
+        </div>
+        <div class="pixel-panel">
+          <div class="panel-title">&gt; EVENT FEED</div>
+          <div class="events-list">${events}</div>
+        </div>
+      `
+    }
+
+    async function load() {
+      try {
+        const res  = await fetch('/me/colony', { headers: { Authorization: `Bearer ${token}` } })
+        if (res.status === 401) { window.location.href = '/login'; return }
+        const data = await res.json()
+        document.getElementById('root').innerHTML = data.status === 'running'
+          ? renderColony(data)
+          : renderDeposit(data)
+      } catch {
+        document.getElementById('root').innerHTML =
+          '<div id="loading" style="color:var(--red)">CONNECTION FAILED — RETRYING...</div>'
+      }
+    }
+
+    load()
+    setInterval(load, 15000)
+  </script>
+</body>
+</html>

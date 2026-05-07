@@ -7,11 +7,15 @@ const verifyPayment = require('./verify')
 const { handleWebhook: atrestWebhook } = require('./atrest')
 const childEarner = require('./childEarner')
 const { getUSDCBalance } = require('./childWallet')
+const authModule = require('./auth')
+const userColony = require('./userColony')
+const db = require('./db')
 
 const app = express()
 const cors = require('cors')
 app.use(cors())
 app.use(express.json())
+app.use(express.static(path.join(__dirname, '../public')))
 
 // Build a 402 response — routes payment to the correct wallet
 // (a specific child's wallet if childId is provided, otherwise GAIA mother)
@@ -570,8 +574,55 @@ app.post('/sweep-polygon', async (req, res) => {
   res.json({ ok: true, grandTotal: grandTotal.toFixed(4), children: results })
 })
 
+// ── Auth routes ───────────────────────────────────────────────
+
+app.post('/auth/signup', authModule.signup)
+app.post('/auth/login',  authModule.login)
+app.get('/auth/me',      authModule.requireAuth, authModule.me)
+
+// ── User colony routes ────────────────────────────────────────
+
+// User's colony state
+app.get('/me/colony', authModule.requireAuth, (req, res) => {
+  const state = userColony.getColonyState(req.user.userId)
+  if (!state) {
+    const user = db.findById(req.user.userId)
+    return res.json({
+      status:  user?.colonyStatus || 'awaiting_deposit',
+      message: user?.walletAddress
+        ? `Deposit at least ${authModule.MIN_DEPOSIT_MATIC} MATIC to ${user.walletAddress} on Polygon (chain 137) to launch your colony`
+        : 'Wallet not yet generated',
+      walletAddress: user?.walletAddress || null,
+    })
+  }
+  res.json({ status: 'running', ...state })
+})
+
+// Manually trigger deposit check (useful for testing)
+app.post('/me/colony/check-deposit', authModule.requireAuth, async (req, res) => {
+  const user = db.findById(req.user.userId)
+  if (!user) return res.status(404).json({ error: 'User not found' })
+  if (userColony.getColony(req.user.userId)) return res.json({ status: 'already_running' })
+
+  if (user.walletAddress) {
+    userColony.watchForDeposit(user.id, user.walletAddress)
+    res.json({ status: 'watching', walletAddress: user.walletAddress, minMatic: authModule.MIN_DEPOSIT_MATIC })
+  } else {
+    res.status(400).json({ error: 'No wallet address on account' })
+  }
+})
+
+// ── Static pages ──────────────────────────────────────────────
+
+app.get('/signup', (req, res) => res.sendFile(path.join(__dirname, '../public/signup.html')))
+app.get('/login',  (req, res) => res.sendFile(path.join(__dirname, '../public/login.html')))
+app.get('/app',    authModule.requireAuth, (req, res) => res.sendFile(path.join(__dirname, '../public/app.html')))
+
+// ── Start ─────────────────────────────────────────────────────
+
 app.listen(config.port, () => {
   console.log(`GAIA serving ${Object.keys(config.services).length} services on port ${config.port}`)
+  userColony.resumeAll()
 })
 
 module.exports = app
