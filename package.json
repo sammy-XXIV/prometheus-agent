@@ -18,6 +18,7 @@
     "node-cron": "^4.2.1",
     "node-telegram-bot-api": "^0.67.0",
     "nodemailer": "^8.0.7",
+    "resend": "^6.12.3",
     "stripe": "^22.1.0"
   }
 }
