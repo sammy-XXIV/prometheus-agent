@@ -1,7 +1,7 @@
-const bcrypt  = require('bcryptjs')
-const jwt     = require('jsonwebtoken')
-const { Resend } = require('resend')
-const db      = require('./db')
+const bcrypt      = require('bcryptjs')
+const jwt         = require('jsonwebtoken')
+const nodemailer  = require('nodemailer')
+const db          = require('./db')
 
 const JWT_SECRET        = process.env.JWT_SECRET || 'gaia-dev-secret-change-in-prod'
 const MIN_DEPOSIT_MATIC = 0.5
@@ -13,15 +13,20 @@ const pending = new Map()
 // ── Email sender ──────────────────────────────────────────────
 
 async function sendOTP(email, otp) {
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) {
+  const user = process.env.GMAIL_USER
+  const pass = process.env.GMAIL_APP_PASSWORD
+  if (!user || !pass) {
     console.log(`[AUTH] OTP for ${email}: ${otp}`)
     return true
   }
 
-  const resend = new Resend(apiKey)
-  await resend.emails.send({
-    from:    'GAIA Colony <onboarding@resend.dev>',
+  const transport = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass },
+  })
+
+  await transport.sendMail({
+    from:    `"GAIA Colony" <${user}>`,
     to:      email,
     subject: 'Your GAIA verification code',
     text:    `Your GAIA verification code is: ${otp}\n\nExpires in 10 minutes.`,
