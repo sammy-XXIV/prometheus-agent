@@ -33,7 +33,7 @@ const crypto     = require('crypto')
 
 const GAMMA_API        = 'https://gamma-api.polymarket.com'
 const CLOB_HOST        = 'https://clob.polymarket.com'
-const POLYGON_CHAIN    = POLYGON_CHAIN_ID
+const POLYGON_CHAIN    = process.env.POLYGON_TESTNET === 'true' ? 80002 : 137
 const CTF_EXCHANGE     = '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E'
 const NEG_RISK_ADAPTER = '0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296'
 const POLY_USDC        = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'  // native USDC on Polygon
@@ -92,7 +92,7 @@ let childCreds = {}   // childId → { apiKey, secret, passphrase }
 const approvedWallets  = new Set()   // addresses already approved CTF Exchange
 const fundedChildren   = new Set()   // childIds already seeded on Polygon
 
-const { polygonProvider, throttledLog, POLYGON_CHAIN_ID, TESTNET } = require('./rpcProvider')
+const { polygonProvider, throttledLog } = require('./rpcProvider')
 const anthropic        = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 // ── Persistence ───────────────────────────────────────────────
