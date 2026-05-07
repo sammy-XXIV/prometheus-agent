@@ -10,6 +10,7 @@ const { getUSDCBalance } = require('./childWallet')
 const authModule = require('./auth')
 const userColony = require('./userColony')
 const db = require('./db')
+const { POLYGON_CHAIN_ID, TESTNET } = require('./rpcProvider')
 
 const app = express()
 const cors = require('cors')
@@ -312,13 +313,10 @@ app.get('/colony/balances', async (req, res) => {
     const ERC20_ABI = ['function balanceOf(address) view returns (uint256)']
     const POLY_USDC    = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
     const POLY_USDC_E  = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
-    const POLY_RPCS    = [
-      process.env.POLYGON_RPC,
-      'https://polygon-bor-rpc.publicnode.com',
-      'https://polygon.meowrpc.com',
-      'https://1rpc.io/matic',
-      'https://polygon.drpc.org',
-    ].filter(Boolean)
+    const defaultPolyRpcs = TESTNET
+      ? ['https://rpc-amoy.polygon.technology/']
+      : ['https://polygon-bor-rpc.publicnode.com', 'https://polygon.meowrpc.com', 'https://1rpc.io/matic', 'https://polygon.drpc.org']
+    const POLY_RPCS = [process.env.POLYGON_RPC, ...defaultPolyRpcs].filter(Boolean)
 
     async function bal(provider, token, address) {
       try {
@@ -337,7 +335,7 @@ app.get('/colony/balances', async (req, res) => {
         let settled = false
         let pending = POLY_RPCS.length
         for (const rpc of POLY_RPCS) {
-          const p = new ethers.JsonRpcProvider(rpc, { chainId: 137, name: 'polygon' }, { staticNetwork: true })
+          const p = new ethers.JsonRpcProvider(rpc, { chainId: POLYGON_CHAIN_ID, name: 'polygon' }, { staticNetwork: true })
           bal(p, token, address).then(v => {
             pending--
             if (!settled && v !== null) { settled = true; resolve(v) }
@@ -592,7 +590,7 @@ app.get('/me/colony', authModule.requireAuth, (req, res) => {
     return res.json({
       status:  user?.colonyStatus || 'awaiting_deposit',
       message: user?.walletAddress
-        ? `Deposit at least ${authModule.MIN_DEPOSIT_MATIC} MATIC to ${user.walletAddress} on Polygon (chain 137) to launch your colony`
+        ? `Deposit at least ${authModule.MIN_DEPOSIT_MATIC} MATIC to ${user.walletAddress} on ${TESTNET ? 'Amoy testnet (chain 80002)' : 'Polygon (chain 137)'} to launch your colony`
         : 'Wallet not yet generated',
       walletAddress: user?.walletAddress || null,
     })

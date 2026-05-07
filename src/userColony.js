@@ -4,6 +4,7 @@
 // Kite Passport registration runs under the main GAIA kpass account on Railway.
 
 const { ethers } = require('ethers')
+const { POLYGON_CHAIN_ID, TESTNET } = require('./rpcProvider')
 const { spawnChild, fitness, timeRemaining, shouldTerminate, shouldReproduce } = require('./spawn')
 const registry = require('./registry')
 const db = require('./db')
@@ -25,16 +26,15 @@ function deriveUserSigningKey(userId) {
 }
 
 async function getPolygonMaticBalance(address) {
-  const rpcs = [
-    process.env.POLYGON_RPC,
-    'https://polygon-bor-rpc.publicnode.com',
-    'https://polygon.meowrpc.com',
-    'https://1rpc.io/matic',
-  ].filter(Boolean)
+  const defaultRpcs = TESTNET
+    ? ['https://rpc-amoy.polygon.technology/']
+    : ['https://polygon-bor-rpc.publicnode.com', 'https://polygon.meowrpc.com', 'https://1rpc.io/matic']
+
+  const rpcs = [process.env.POLYGON_RPC, ...defaultRpcs].filter(Boolean)
 
   for (const rpc of rpcs) {
     try {
-      const provider = new ethers.JsonRpcProvider(rpc, { chainId: 137, name: 'polygon' }, { staticNetwork: true })
+      const provider = new ethers.JsonRpcProvider(rpc, { chainId: POLYGON_CHAIN_ID, name: 'polygon' }, { staticNetwork: true })
       const bal = await Promise.race([
         provider.getBalance(address),
         new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 5000)),

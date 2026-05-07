@@ -8,9 +8,11 @@
 
 const { ethers } = require('ethers')
 
-const KITE_RPC    = 'https://rpc.gokite.ai/'
-const BASE_RPC    = 'https://mainnet.base.org'
-const POLYGON_RPC = process.env.POLYGON_RPC || 'https://polygon-bor-rpc.publicnode.com'
+const KITE_RPC     = 'https://rpc.gokite.ai/'
+const BASE_RPC     = 'https://mainnet.base.org'
+const TESTNET      = process.env.POLYGON_TESTNET === 'true'
+const POLYGON_RPC  = process.env.POLYGON_RPC  || (TESTNET ? 'https://rpc-amoy.polygon.technology/' : 'https://polygon-bor-rpc.publicnode.com')
+const POLYGON_CHAIN_ID = TESTNET ? 80002 : 137
 
 // Throttle: one log line per error key per 30 seconds
 const _lastLogged = {}
@@ -35,7 +37,7 @@ function makeProvider(url, chainId) {
 
 const kiteProvider    = makeProvider(KITE_RPC,    2368)   // Kite chain ID
 const baseProvider    = makeProvider(BASE_RPC,    8453)   // Base mainnet
-const polygonProvider = makeProvider(POLYGON_RPC, 137)    // Polygon mainnet
+const polygonProvider = makeProvider(POLYGON_RPC, POLYGON_CHAIN_ID)
 
 module.exports = {
   kiteProvider,
@@ -45,4 +47,6 @@ module.exports = {
   KITE_RPC,
   BASE_RPC,
   POLYGON_RPC,
+  POLYGON_CHAIN_ID,
+  TESTNET,
 }
