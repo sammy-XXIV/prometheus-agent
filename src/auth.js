@@ -77,14 +77,13 @@ async function signup(req, res) {
   // Auto-clean after TTL
   setTimeout(() => pending.delete(email.toLowerCase()), OTP_TTL_MS + 1000)
 
-  try {
-    await sendOTP(email, otp)
-  } catch (e) {
-    console.error('[AUTH] Email send failed:', e.message)
-    // Don't block signup if email fails — OTP still logged to console
-  }
-
+  // Send email in background — don't block the response
   res.json({ step: 'verify', message: 'Verification code sent to your email' })
+
+  Promise.race([
+    sendOTP(email, otp),
+    new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 10000)),
+  ]).catch(e => console.error('[AUTH] Email send failed:', e.message))
 }
 
 async function verify(req, res) {
