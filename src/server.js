@@ -297,7 +297,8 @@ app.get('/colony/fossils', (req, res) => {
 // Multi-chain balance snapshot — mother + all alive children across Kite/Base/Polygon
 let _balanceCache = null
 let _balanceCacheAt = 0
-const BALANCE_CACHE_MS = 25000  // serve cached result if < 25s old
+const BALANCE_CACHE_MS = 25000
+if (TESTNET) { _balanceCache = null; _balanceCacheAt = 0 }
 
 app.get('/colony/balances', async (req, res) => {
   try {
@@ -311,8 +312,8 @@ app.get('/colony/balances', async (req, res) => {
     const { ethers } = require('ethers')
 
     const ERC20_ABI = ['function balanceOf(address) view returns (uint256)']
-    const POLY_USDC    = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
-    const POLY_USDC_E  = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
+    const POLY_USDC    = TESTNET ? null : '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
+    const POLY_USDC_E  = TESTNET ? null : '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
     const defaultPolyRpcs = TESTNET
       ? ['https://rpc-amoy.polygon.technology/']
       : ['https://polygon-bor-rpc.publicnode.com', 'https://polygon.meowrpc.com', 'https://1rpc.io/matic', 'https://polygon.drpc.org']
@@ -346,8 +347,15 @@ app.get('/colony/balances', async (req, res) => {
       })
     }
 
-    // Sum USDC + USDC.e on Polygon for a given address
+    // On testnet return native MATIC balance; on mainnet sum USDC + USDC.e
     async function polyUSDC(address) {
+      if (TESTNET) {
+        const p = new ethers.JsonRpcProvider(POLY_RPCS[0], { chainId: POLYGON_CHAIN_ID, name: 'polygon' }, { staticNetwork: true })
+        try {
+          const raw = await Promise.race([p.getBalance(address), new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 6000))])
+          return parseFloat(ethers.formatEther(raw))
+        } catch { return null }
+      }
       const [native, bridged] = await Promise.all([
         polyBal(POLY_USDC, address),
         polyBal(POLY_USDC_E, address),
