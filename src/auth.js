@@ -1,7 +1,10 @@
 const bcrypt      = require('bcryptjs')
 const jwt         = require('jsonwebtoken')
 const nodemailer  = require('nodemailer')
+const { OAuth2Client } = require('google-auth-library')
 const db          = require('./db')
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 
 const JWT_SECRET        = process.env.JWT_SECRET || 'gaia-dev-secret-change-in-prod'
 const MIN_DEPOSIT_MATIC = 0.5
@@ -13,20 +16,21 @@ const pending = new Map()
 // ── Email sender ──────────────────────────────────────────────
 
 async function sendOTP(email, otp) {
-  const user = process.env.GMAIL_USER
-  const pass = process.env.GMAIL_APP_PASSWORD
-  if (!user || !pass) {
+  const gmailUser = process.env.GMAIL_USER
+  const gmailPass = process.env.GMAIL_APP_PASSWORD
+
+  if (!gmailUser || !gmailPass) {
     console.log(`[AUTH] OTP for ${email}: ${otp}`)
     return true
   }
 
-  const transport = nodemailer.createTransport({
+  const transporter = nodemailer.createTransport({
     service: 'gmail',
-    auth: { user, pass },
+    auth: { user: gmailUser, pass: gmailPass },
   })
 
-  await transport.sendMail({
-    from:    `"GAIA Colony" <${user}>`,
+  await transporter.sendMail({
+    from:    `GAIA Colony <${gmailUser}>`,
     to:      email,
     subject: 'Your GAIA verification code',
     text:    `Your GAIA verification code is: ${otp}\n\nExpires in 10 minutes.`,
@@ -40,7 +44,6 @@ async function sendOTP(email, otp) {
       </div>
     `,
   })
-  return true
 }
 
 // ── Middleware ────────────────────────────────────────────────
@@ -166,4 +169,38 @@ function me(req, res) {
   })
 }
 
-module.exports = { requireAuth, signup, verify, login, me, JWT_SECRET, MIN_DEPOSIT_MATIC }
+async function googleAuth(req, res) {
+  const { credential } = req.body || {}
+  if (!credential) return res.status(400).json({ error: 'Missing Google credential' })
+
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken:  credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    })
+    const { email, email_verified } = ticket.getPayload()
+    if (!email_verified) return res.status(400).json({ error: 'Google email not verified' })
+
+    let user = db.findByEmail(email)
+    if (!user) user = db.create(email, null)
+
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' })
+
+    if (user.colonyStatus === 'awaiting_deposit' && user.walletAddress) {
+      const userColony = require('./userColony')
+      userColony.watchForDeposit(user.id, user.walletAddress)
+    }
+
+    res.json({
+      token,
+      user: { id: user.id, email: user.email, walletAddress: user.walletAddress, colonyStatus: user.colonyStatus },
+      next: user.walletAddress
+        ? `Deposit at least ${MIN_DEPOSIT_MATIC} MATIC to ${user.walletAddress} on Polygon to launch your colony`
+        : 'Set GAIA_BASE_SIGNING_KEY to enable wallet generation',
+    })
+  } catch (e) {
+    res.status(401).json({ error: 'Invalid Google token' })
+  }
+}
+
+module.exports = { requireAuth, signup, verify, login, me, googleAuth, JWT_SECRET, MIN_DEPOSIT_MATIC }

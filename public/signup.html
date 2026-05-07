@@ -135,6 +135,22 @@
       <div id="step1">
         <div class="step-indicator">STEP 1 OF 2 — CREATE ACCOUNT</div>
         <div class="error-box" id="err1"></div>
+        <div style="display:flex;justify-content:center;margin-bottom:18px">
+          <div id="g_id_onload"
+            data-client_id="644983983437-d1ma66vkgv7r0vrqp4hs0d7ncd0q2f48.apps.googleusercontent.com"
+            data-callback="handleGoogleCredential"
+            data-auto_prompt="false">
+          </div>
+          <div class="g_id_signin"
+            data-type="standard"
+            data-shape="rectangular"
+            data-theme="filled_black"
+            data-text="signup_with"
+            data-size="large"
+            data-logo_alignment="left">
+          </div>
+        </div>
+        <div style="text-align:center;font-size:6px;color:var(--green-dim);letter-spacing:2px;margin-bottom:18px">— OR —</div>
         <label class="field-label">EMAIL ADDRESS</label>
         <input type="email" id="email" placeholder="you@example.com" autocomplete="email">
         <label class="field-label">PASSWORD</label>
@@ -162,8 +178,48 @@
     </div>
   </div>
 
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
     let signupEmail = ''
+
+    function handleGoogleCredential(response) {
+      fetch('/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential }),
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          const errEl = document.getElementById('err1')
+          errEl.textContent = '> ' + data.error
+          errEl.style.display = 'block'
+          return
+        }
+        localStorage.setItem('gaia_token', data.token)
+        localStorage.setItem('gaia_user', JSON.stringify(data.user))
+        document.getElementById('step1').style.display = 'none'
+        document.getElementById('login-link').style.display = 'none'
+        const succ = document.getElementById('success')
+        succ.style.display = 'block'
+        succ.innerHTML = `
+          COLONY ACCOUNT CREATED.<br><br>
+          TO LAUNCH YOUR COLONY, DEPOSIT<br>
+          <span style="color:var(--green)">0.5+ MATIC</span> ON POLYGON (CHAIN 137) TO:<br>
+          <div class="wallet-display" onclick="copyAddr('${data.user.walletAddress}')" title="CLICK TO COPY">
+            ${data.user.walletAddress || 'WALLET UNAVAILABLE'}
+          </div>
+          COLONY WILL AUTO-LAUNCH ONCE<br>
+          DEPOSIT IS DETECTED.<br><br>
+          <a href="/app" style="color:var(--green)">&gt;&gt; OPEN DASHBOARD</a>
+        `
+      })
+      .catch(() => {
+        const errEl = document.getElementById('err1')
+        errEl.textContent = '> NETWORK ERROR — TRY AGAIN'
+        errEl.style.display = 'block'
+      })
+    }
 
     async function doSignup() {
       const email    = document.getElementById('email').value.trim()

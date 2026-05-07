@@ -120,6 +120,23 @@
     <div class="pixel-panel">
       <div class="error-box" id="error"></div>
 
+      <div style="display:flex;justify-content:center;margin-bottom:18px">
+        <div id="g_id_onload"
+          data-client_id="644983983437-d1ma66vkgv7r0vrqp4hs0d7ncd0q2f48.apps.googleusercontent.com"
+          data-callback="handleGoogleCredential"
+          data-auto_prompt="false">
+        </div>
+        <div class="g_id_signin"
+          data-type="standard"
+          data-shape="rectangular"
+          data-theme="filled_black"
+          data-text="signin_with"
+          data-size="large"
+          data-logo_alignment="left">
+        </div>
+      </div>
+      <div style="text-align:center;font-size:6px;color:var(--green-dim);letter-spacing:2px;margin-bottom:18px">— OR —</div>
+
       <label class="field-label">EMAIL ADDRESS</label>
       <input type="email" id="email" autocomplete="email">
 
@@ -134,7 +151,33 @@
     </div>
   </div>
 
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
+    function handleGoogleCredential(response) {
+      fetch('/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential }),
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          const errEl = document.getElementById('error')
+          errEl.textContent = '> ' + data.error
+          errEl.style.display = 'block'
+          return
+        }
+        localStorage.setItem('gaia_token', data.token)
+        localStorage.setItem('gaia_user', JSON.stringify(data.user))
+        window.location.href = '/app'
+      })
+      .catch(() => {
+        const errEl = document.getElementById('error')
+        errEl.textContent = '> NETWORK ERROR — TRY AGAIN'
+        errEl.style.display = 'block'
+      })
+    }
+
     async function doLogin() {
       const email    = document.getElementById('email').value.trim()
       const password = document.getElementById('password').value

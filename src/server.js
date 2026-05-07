@@ -576,6 +576,7 @@ app.post('/sweep-polygon', async (req, res) => {
 
 // ── Auth routes ───────────────────────────────────────────────
 
+app.post('/auth/google', authModule.googleAuth)
 app.post('/auth/signup', authModule.signup)
 app.post('/auth/verify', authModule.verify)
 app.post('/auth/login',  authModule.login)
