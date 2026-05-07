@@ -250,6 +250,8 @@
           <div class="child-row">FIT    <span class="cv">${c.fitness}</span></div>
           <div class="child-row">TIME   <span class="cv">${c.hoursRemaining}H</span></div>
           <div class="child-row">EARNED <span class="cv">$${(c.totalEarned||0).toFixed(4)}</span></div>
+          <div class="child-row">KITE   <span class="cv" style="font-size:5px">${c.kiteAgentId || '...'}</span></div>
+          <div class="child-row">SESSION<span class="cv">${c.kiteSessionStatus || 'pending'}</span></div>
         </div>
       `).join('') || '<div style="font-size:7px;color:var(--green-dim)">NO CHILDREN YET</div>'
 
