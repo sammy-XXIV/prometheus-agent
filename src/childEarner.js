@@ -352,6 +352,8 @@ async function requestFunds(childId, amountUSDC) {
 // ── Main earning loop per child ────────────────────────────────
 
 async function earnCycle(childId) {
+  if (process.env.PAUSE_EARNERS === 'true') return
+
   const earner = earners.get(childId)
   if (!earner || !earner.running) return
 
