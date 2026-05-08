@@ -9,14 +9,42 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3000'
 let agentId = process.env.ATREST_AGENT_ID?.trim() || null
 let apiKey = process.env.ATREST_API_KEY?.trim() || null
 
-function authHeaders() {
-  if (apiKey && agentId) {
-    return { 'X-Api-Key': apiKey, 'X-Agent-Id': agentId }
-  }
-  if (SESSION) {
-    return { Cookie: `atrest_session=${SESSION}` }
-  }
+const ATREST_CAPABILITIES = [
+  'code_review', 'market_research', 'workflow_automation', 'fact_checking',
+  'citation_gathering', 'competitive_analysis', 'document_formatting', 'email_drafting',
+  'research', 'summarization', 'translation', 'copywriting', 'content_creation',
+  'report_generation', 'trend_forecasting', 'anomaly_detection', 'dashboard_building',
+  'data_analysis', 'data_cleaning', 'bug_fixing'
+]
+
+function authHeaders(key = apiKey, id = agentId) {
+  if (key && id) return { 'X-Api-Key': key, 'X-Agent-Id': id }
+  if (SESSION)   return { Cookie: `atrest_session=${SESSION}` }
   return {}
+}
+
+async function sendHeartbeat(key = apiKey, id = agentId) {
+  if (!key || !id) return
+  try {
+    await axios.post(`${ATREST_API}/agents/${id}/heartbeat`, {}, {
+      headers: { 'Content-Type': 'application/json', ...authHeaders(key, id) }
+    })
+    console.log(`[ATREST] Heartbeat sent for ${id}`)
+  } catch (e) {
+    console.log('[ATREST] Heartbeat failed:', e.response?.data || e.message)
+  }
+}
+
+async function patchAgent(id, key, fields) {
+  try {
+    const res = await axios.patch(`${ATREST_API}/agents/${id}`, fields, {
+      headers: { 'Content-Type': 'application/json', ...authHeaders(key, id) }
+    })
+    return res.data?.data
+  } catch (e) {
+    console.log('[ATREST] Patch failed:', e.response?.data || e.message)
+    return null
+  }
 }
 
 async function registerAgent() {
@@ -26,23 +54,21 @@ async function registerAgent() {
   }
   if (agentId) {
     console.log(`[ATREST] Already registered: ${agentId}`)
+    await sendHeartbeat()
     return true
   }
   try {
     const res = await axios.post(`${ATREST_API}/agents`, {
       name: 'GAIA',
       endpoint_url: `${BASE_URL}/webhook/atrest`,
-      capabilities: [
-        'summarize', 'blog', 'email', 'linkedin', 'content',
-        'sentiment', 'research', 'data', 'code', 'debug',
-        'sql', 'audit', 'crypto', 'trading', 'business', 'advice'
-      ]
+      capabilities: ATREST_CAPABILITIES
     }, {
       headers: { 'Content-Type': 'application/json', ...authHeaders() }
     })
-    agentId = res.data?.agent_id || res.data?.id
-    apiKey = res.data?.api_key || apiKey
+    agentId = res.data?.data?.id || res.data?.agent_id || res.data?.id
+    apiKey = res.data?.data?.api_key || res.data?.api_key || apiKey
     console.log(`[ATREST] Registered! Agent ID: ${agentId}`)
+    await sendHeartbeat()
     return true
   } catch (e) {
     console.log('[ATREST] Registration failed:', JSON.stringify(e.response?.data) || e.message)
@@ -72,15 +98,15 @@ async function executeTask(task) {
   }
 }
 
-async function handleWebhook(task) {
+async function handleWebhook(task, key = apiKey, id = agentId) {
   console.log(`[ATREST] Task received: ${task.title} ($${task.budget_usdc || '?'} USDC)`)
   const result = await executeTask(task)
   if (!result) return null
 
   if (task.callback_url) {
     try {
-      await axios.post(task.callback_url, { result, agent_id: agentId }, {
-        headers: authHeaders()
+      await axios.post(task.callback_url, { result, agent_id: id }, {
+        headers: authHeaders(key, id)
       })
       console.log(`[ATREST] Result submitted via callback for: ${task.title}`)
     } catch (e) {
@@ -92,7 +118,7 @@ async function handleWebhook(task) {
     const taskId = task.task_id || task.id
     try {
       await axios.post(`${ATREST_API}/tasks/${taskId}/submit`, { result }, {
-        headers: { 'Content-Type': 'application/json', ...authHeaders() }
+        headers: { 'Content-Type': 'application/json', ...authHeaders(key, id) }
       })
       console.log(`[ATREST] Result submitted for task: ${taskId}`)
     } catch (e) {
@@ -113,17 +139,17 @@ async function registerUserAgent(userId, email, baseUrl) {
     const res = await axios.post(`${ATREST_API}/agents`, {
       name: `GAIA-${email.split('@')[0]}`,
       endpoint_url: `${baseUrl}/webhook/atrest/user/${userId}`,
-      capabilities: [
-        'summarize', 'blog', 'email', 'linkedin', 'content',
-        'sentiment', 'research', 'data', 'code', 'debug',
-        'sql', 'audit', 'crypto', 'trading', 'business', 'advice'
-      ]
+      capabilities: ATREST_CAPABILITIES
     }, {
       headers: { 'Content-Type': 'application/json', 'X-Api-Key': masterKey }
     })
-    const newAgentId = res.data?.agent_id || res.data?.id
-    const newApiKey  = res.data?.api_key
+    const newAgentId = res.data?.data?.id || res.data?.agent_id || res.data?.id
+    const newApiKey  = res.data?.data?.api_key || res.data?.api_key
     console.log(`[ATREST] Registered user agent for ${email}: ${newAgentId}`)
+
+    // Immediately bring online
+    if (newAgentId && newApiKey) await sendHeartbeat(newApiKey, newAgentId)
+
     return { agentId: newAgentId, apiKey: newApiKey }
   } catch (e) {
     console.log(`[ATREST] User agent registration failed for ${email}:`, JSON.stringify(e.response?.data) || e.message)
@@ -134,6 +160,8 @@ async function registerUserAgent(userId, email, baseUrl) {
 async function startAtrest() {
   console.log('[ATREST] Initializing Atrest.ai integration...')
   await registerAgent()
+  // Send heartbeat every 4 minutes to stay online
+  setInterval(() => sendHeartbeat(), 4 * 60 * 1000)
 }
 
-module.exports = { startAtrest, handleWebhook, registerUserAgent }
+module.exports = { startAtrest, handleWebhook, registerUserAgent, sendHeartbeat, patchAgent }

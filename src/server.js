@@ -4,7 +4,7 @@ const path = require('path')
 const config = require('./config')
 const services = require('./services')
 const verifyPayment = require('./verify')
-const { handleWebhook: atrestWebhook } = require('./atrest')
+const { handleWebhook: atrestWebhook, sendHeartbeat: atrestHeartbeat, patchAgent: atrestPatch } = require('./atrest')
 const childEarner = require('./childEarner')
 const { getUSDCBalance } = require('./childWallet')
 const authModule = require('./auth')
@@ -85,7 +85,7 @@ app.post('/webhook/atrest/user/:userId', async (req, res) => {
     const user = db.findById(userId)
     if (!user) return res.status(404).json({ error: 'User not found' })
 
-    const result = await atrestWebhook(req.body)
+    const result = await atrestWebhook(req.body, user.atrestApiKey, user.atrestAgentId)
     if (!result) return res.status(422).json({ error: 'Could not process task' })
     res.json({ result, userId })
   } catch (e) {
