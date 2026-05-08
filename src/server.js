@@ -643,7 +643,7 @@ app.post('/sweep-polygon', async (req, res) => {
   const { polygonProvider } = require('./rpcProvider')
   const POLY_USDC   = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
   const POLY_USDC_E = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
-  const MOTHER      = config.walletAddress
+  const MOTHER      = '0x7B60394f9FC96eD4d7ba7BE396E5315513fb6fA4'  // Polygon EOA (not the Kite AA wallet)
   const ERC20       = ['function balanceOf(address) view returns (uint256)', 'function transfer(address,uint256) returns (bool)']
 
   let colony

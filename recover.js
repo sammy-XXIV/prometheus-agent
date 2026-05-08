@@ -14,7 +14,7 @@ require('dotenv').config()
 const { ethers } = require('ethers')
 const { polygonProvider } = require('./src/rpcProvider')
 
-const MOTHER      = '0x9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'
+const MOTHER      = '0x7B60394f9FC96eD4d7ba7BE396E5315513fb6fA4'
 const POLY_USDC   = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'  // native USDC
 const POLY_USDC_E = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'  // bridged USDC.e
 const ERC20       = [

@@ -23,7 +23,7 @@ const KPASS_BIN = process.env.KPASS_BIN ||
 
 const KITE_USDC      = '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e'
 const BASE_USDC      = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
-const MOTHER_ADDRESS = '0x9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'
+const MOTHER_ADDRESS = '0x9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'  // Kite AA wallet (correct for Kite chain drains)
 
 const ERC20_ABI = [
   'function balanceOf(address) view returns (uint256)',
