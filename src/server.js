@@ -571,6 +571,15 @@ app.post('/colony/spawn-one', (req, res) => {
   }
 })
 
+// ── Polymarket positions ──────────────────────────────────────────────────────
+
+app.get('/colony/positions', (req, res) => {
+  try {
+    const poly = require('./polymarket')
+    res.json(poly.getPositions ? poly.getPositions() : {})
+  } catch { res.json({}) }
+})
+
 // ── Colony cull — keep one child, terminate the rest ─────────────────────────
 
 app.post('/colony/cull', async (req, res) => {

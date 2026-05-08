@@ -388,6 +388,6 @@ async function run() {
   }, 30000)
 }
 
-module.exports = { recordChildRevenue, colony }
+module.exports = { recordChildRevenue, colony, startEarner }
 
 run().catch(console.error)

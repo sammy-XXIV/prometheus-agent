@@ -218,6 +218,18 @@ html, body {
   margin: 2px 0;
 }
 
+/* Polymarket positions panel */
+#poly-panel {
+  position: fixed;
+  bottom: 90px; right: 14px;
+  width: 220px;
+  font-size: 5px;
+  pointer-events: none;
+  z-index: 11;
+}
+#poly-title { color: var(--amber); letter-spacing: 2px; margin-bottom: 4px; font-size: 5px; }
+.pos-row { color: var(--green); margin: 2px 0; line-height: 1.4; opacity: 0.85; }
+
 /* Control bar — bottom left above event log */
 #control-bar {
   position: absolute;
@@ -474,6 +486,12 @@ html, body {
   <div id="event-log">
     <span id="event-log-title">// EVENT LOG</span>
   </div>
+</div>
+
+<!-- Polymarket open positions panel -->
+<div id="poly-panel" class="pixel-panel">
+  <div id="poly-title">// POLY POSITIONS</div>
+  <div id="poly-positions">no open positions</div>
 </div>
 
 <!-- Control bar lives OUTSIDE #hud so pointer-events work unconditionally -->
@@ -1162,7 +1180,23 @@ requestAnimationFrame(animLoop)
 fetchColony()
 fetchBalance()
 fetchSeedStatus()
+fetchPositions()
 setInterval(fetchBalance, 30000)
+setInterval(fetchPositions, 15000)
+
+async function fetchPositions() {
+  try {
+    const r = await fetch('/colony/positions')
+    const d = await r.json()
+    const open = Object.values(d).filter(p => !p.resolved)
+    const el = document.getElementById('poly-positions')
+    if (!el) return
+    if (!open.length) { el.textContent = 'no open positions'; return }
+    el.innerHTML = open.map(p =>
+      `<div class="pos-row">${p.childId.replace('GAIA-','')} · ${p.side} $${p.stake?.toFixed(2)} · "${p.question?.slice(0,38)}…"</div>`
+    ).join('')
+  } catch {}
+}
 </script>
 </body>
 </html>

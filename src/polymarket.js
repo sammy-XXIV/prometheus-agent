@@ -733,6 +733,14 @@ async function runForChild(child) {
       console.log(`[POLY] 📝 Paper trade — ${side} $${betSize.toFixed(2)} on "${market.question.slice(0, 50)}" (${result.reason})`)
     } else {
       console.log(`[POLY] ✅ Order filled | orderId: ${result.orderId}`)
+      if (_colony) {
+        const ev = _colony.events
+        if (ev) {
+          const time = new Date().toTimeString().split(' ')[0]
+          ev.unshift({ time, msg: `${child.id.replace('GAIA-','')} bet ${side} $${betSize.toFixed(2)} — "${market.question.slice(0,45)}"`, type: 'success' })
+          if (ev.length > 50) ev.pop()
+        }
+      }
     }
 
     openPosition(market, side, betSize, price, child.id, analysis, wallet.address)
