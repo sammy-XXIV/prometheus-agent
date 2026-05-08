@@ -733,3 +733,7 @@ app.listen(config.port, () => {
 })
 
 module.exports = app
+Object.defineProperty(module.exports, '_polySeedPaused', {
+  get: () => _polySeedPaused,
+  enumerable: true,
+})
