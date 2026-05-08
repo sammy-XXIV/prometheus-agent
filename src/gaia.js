@@ -361,7 +361,7 @@ async function run() {
   childEarner.init(colony, onChildEarning)
 
   colonyEvent('GAIA Genesis initialized', 'info')
-  spawnInitialChildren(3)
+  spawnInitialChildren(parseInt(process.env.INITIAL_CHILDREN || '3'))
 
   require('./server')
   const startHunter = require('./hunter')
