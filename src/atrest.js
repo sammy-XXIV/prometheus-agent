@@ -47,6 +47,8 @@ async function patchAgent(id, key, fields) {
   }
 }
 
+const MOTHER_WALLET = '0x7B60394f9FC96eD4d7ba7BE396E5315513fb6fA4'
+
 async function registerAgent() {
   if (!SESSION && !(apiKey && agentId)) {
     console.log('[ATREST] No ATREST_SESSION or ATREST_API_KEY set — skipping registration')
@@ -61,7 +63,8 @@ async function registerAgent() {
     const res = await axios.post(`${ATREST_API}/agents`, {
       name: 'GAIA',
       endpoint_url: `${BASE_URL}/webhook/atrest`,
-      capabilities: ATREST_CAPABILITIES
+      capabilities: ATREST_CAPABILITIES,
+      metadata: { kite_wallet: MOTHER_WALLET, chain: 'polygon' }
     }, {
       headers: { 'Content-Type': 'application/json', ...authHeaders() }
     })
@@ -139,7 +142,8 @@ async function registerUserAgent(userId, email, baseUrl) {
     const res = await axios.post(`${ATREST_API}/agents`, {
       name: `GAIA-${email.split('@')[0]}`,
       endpoint_url: `${baseUrl}/webhook/atrest/user/${userId}`,
-      capabilities: ATREST_CAPABILITIES
+      capabilities: ATREST_CAPABILITIES,
+      metadata: { kite_wallet: MOTHER_WALLET, chain: 'polygon', user_id: userId }
     }, {
       headers: { 'Content-Type': 'application/json', 'X-Api-Key': masterKey }
     })
