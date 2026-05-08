@@ -480,6 +480,7 @@ html, body {
 <div id="control-bar" class="pixel-panel">
   <button class="ctrl-btn" id="btn-drain" onclick="drainPOL()">⬇ DRAIN POL</button>
   <button class="ctrl-btn" id="btn-seed-toggle" onclick="toggleSeed()">⏸ PAUSE SEED</button>
+  <button class="ctrl-btn" id="btn-cull" onclick="cullColony()">☠ CULL</button>
 </div>
 
 <div id="tip">
@@ -1038,6 +1039,18 @@ async function drainPOL() {
     btn.textContent = '✗ FAILED'
     setTimeout(() => { btn.textContent = '⬇ DRAIN POL'; btn.classList.remove('busy') }, 3000)
   }
+}
+
+async function cullColony() {
+  if (!confirm('Kill all children except the fittest one?')) return
+  const btn = document.getElementById('btn-cull')
+  btn.classList.add('busy')
+  try {
+    const r = await fetch('/colony/cull', { method: 'POST' })
+    const d = await r.json()
+    if (d.kept) alert(`Kept: ${d.kept}\nWallet: ${d.keptWallet}\nKilled: ${d.killed}`)
+  } catch {}
+  btn.classList.remove('busy')
 }
 
 async function toggleSeed() {

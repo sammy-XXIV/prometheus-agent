@@ -96,6 +96,10 @@ function startEarner(child) {
 }
 
 function spawnInitialChildren(count = 3) {
+  if (process.env.PAUSE_SPAWN === 'true') {
+    console.log('[GENESIS] PAUSE_SPAWN=true — skipping initial spawn')
+    return
+  }
   const aliveNow = colony.children.filter(c => c.status === 'alive').length
   if (aliveNow >= count) {
     console.log(`[GENESIS] ${aliveNow} children already alive — skipping initial spawn`)
@@ -188,7 +192,7 @@ async function runColonyCycle() {
       const aliveNow = colony.children.filter(c => c.status === 'alive').length
       const motherUsdc = await getBalance().catch(() => 0)
       const minSeed = child.genome.seedAmount || 1
-      if (aliveNow < MAX_COLONY_SIZE && motherUsdc >= minSeed) {
+      if (aliveNow < MAX_COLONY_SIZE && motherUsdc >= minSeed && process.env.PAUSE_SPAWN !== 'true') {
         const offspring = spawnChild(child.genome, child.generation + 1, child.id, child.knowledge)
         colony.children.push(offspring)
         startEarner(offspring)
@@ -270,7 +274,7 @@ async function thrivingMode() {
 
   const aliveNow = colony.children.filter(c => c.status === 'alive').length
   const motherUsdc = await getBalance().catch(() => 0)
-  if (aliveNow < MAX_COLONY_SIZE && motherUsdc >= 1.0) {
+  if (aliveNow < MAX_COLONY_SIZE && motherUsdc >= 1.0 && process.env.PAUSE_SPAWN !== 'true') {
     const child = spawnChild(null, colony.generation, null)
     colony.children.push(child)
     startEarner(child)

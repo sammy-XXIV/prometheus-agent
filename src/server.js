@@ -553,6 +553,35 @@ app.post('/news',           paymentWall('news'),            async (req, res) => 
 app.post('/sentiment',      paymentWall('sentiment'),       async (req, res) => { try { res.json({ result: await services.sentiment(req.body.text) }) } catch(e) { res.status(500).json({ error: e.message }) }})
 app.post('/advice',         paymentWall('advice'),          async (req, res) => { try { res.json({ result: await services.advice(req.body.topic) }) } catch(e) { res.status(500).json({ error: e.message }) }})
 
+// ── Colony cull — keep one child, terminate the rest ─────────────────────────
+
+app.post('/colony/cull', async (req, res) => {
+  try {
+    const { colony } = require('./gaia')
+    const { drainChild } = require('./gaia')
+    const alive = colony.children.filter(c => c.status === 'alive')
+    if (alive.length === 0) return res.json({ kept: null, killed: 0 })
+
+    // Keep the one with highest fitness (or first if all zero)
+    const { fitness } = require('./spawn')
+    const sorted = alive.sort((a, b) => fitness(b) - fitness(a))
+    const keep   = sorted[0]
+    const kill   = sorted.slice(1)
+
+    for (const child of kill) {
+      child.status = 'terminated'
+      colony.terminated++
+      childEarner.stopChildEarner(child.id)
+      console.log(`[CULL] Terminated ${child.id}`)
+    }
+
+    console.log(`[CULL] Kept ${keep.id} | killed ${kill.length}`)
+    res.json({ kept: keep.id, keptWallet: keep.walletAddress, killed: kill.length })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // ── Colony control — drain POL + toggle poly seed ────────────────────────────
 
 app.post('/colony/drain-pol', async (req, res) => {
