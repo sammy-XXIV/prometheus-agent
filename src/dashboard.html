@@ -481,6 +481,7 @@ html, body {
   <button class="ctrl-btn" id="btn-drain" onclick="drainPOL()">⬇ DRAIN POL</button>
   <button class="ctrl-btn" id="btn-seed-toggle" onclick="toggleSeed()">⏸ PAUSE SEED</button>
   <button class="ctrl-btn" id="btn-cull" onclick="cullColony()">☠ CULL</button>
+  <button class="ctrl-btn" id="btn-spawn-one" onclick="spawnOne()">+ SPAWN ONE</button>
 </div>
 
 <div id="tip">
@@ -1039,6 +1040,18 @@ async function drainPOL() {
     btn.textContent = '✗ FAILED'
     setTimeout(() => { btn.textContent = '⬇ DRAIN POL'; btn.classList.remove('busy') }, 3000)
   }
+}
+
+async function spawnOne() {
+  const btn = document.getElementById('btn-spawn-one')
+  btn.classList.add('busy')
+  try {
+    const r = await fetch('/colony/spawn-one', { method: 'POST' })
+    const d = await r.json()
+    if (d.skipped) alert(d.reason)
+    else alert(`Spawned: ${d.spawned}\nWallet: ${d.wallet}`)
+  } catch {}
+  btn.classList.remove('busy')
 }
 
 async function cullColony() {

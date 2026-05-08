@@ -553,6 +553,24 @@ app.post('/news',           paymentWall('news'),            async (req, res) => 
 app.post('/sentiment',      paymentWall('sentiment'),       async (req, res) => { try { res.json({ result: await services.sentiment(req.body.text) }) } catch(e) { res.status(500).json({ error: e.message }) }})
 app.post('/advice',         paymentWall('advice'),          async (req, res) => { try { res.json({ result: await services.advice(req.body.topic) }) } catch(e) { res.status(500).json({ error: e.message }) }})
 
+// ── Spawn one child manually (ignores PAUSE_SPAWN) ───────────────────────────
+
+app.post('/colony/spawn-one', (req, res) => {
+  try {
+    const { colony, startEarner } = require('./gaia')
+    const { spawnChild } = require('./spawn')
+    const alive = colony.children.filter(c => c.status === 'alive').length
+    if (alive >= 1) return res.json({ skipped: true, reason: `${alive} child(ren) already alive` })
+    const child = spawnChild(null, 1, null)
+    colony.children.push(child)
+    startEarner(child)
+    console.log(`[MANUAL] Spawned ${child.id}`)
+    res.json({ spawned: child.id, wallet: child.walletAddress || null })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // ── Colony cull — keep one child, terminate the rest ─────────────────────────
 
 app.post('/colony/cull', async (req, res) => {
