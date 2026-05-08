@@ -312,7 +312,7 @@ app.get('/colony/fossils', (req, res) => {
 // Multi-chain balance snapshot — mother + all alive children across Kite/Base/Polygon
 let _balanceCache = null
 let _balanceCacheAt = 0
-let _polySeedPaused = false
+let _polySeedPaused = process.env.POLY_SEED_PAUSED === 'true'
 const BALANCE_CACHE_MS = 25000
 if (TESTNET) { _balanceCache = null; _balanceCacheAt = 0 }
 
