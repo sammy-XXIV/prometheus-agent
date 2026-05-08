@@ -6,8 +6,9 @@
 const { ethers } = require('ethers')
 const { POLYGON_CHAIN_ID, TESTNET } = require('./rpcProvider')
 const { spawnChild, fitness, timeRemaining, shouldTerminate, shouldReproduce } = require('./spawn')
-const registry = require('./registry')
-const db = require('./db')
+const registry   = require('./registry')
+const db         = require('./db')
+const childEarner = require('./childEarner')
 
 const MAX_COLONY_SIZE  = 8
 const CYCLE_INTERVAL   = 60_000   // run lifecycle tick every 60s
@@ -101,19 +102,22 @@ function registerChild(child, colony) {
 
 // ── Lifecycle ─────────────────────────────────────────────────
 
-function spawnInitial(colony, userId, signingKey) {
+function spawnInitial(colony, userId, signingKey, earnerOpts) {
+  const aliveNow = colony.children.filter(c => c.status === 'alive').length
+  if (aliveNow >= 3) return
   const shortId = userId.split('-')[0]
-  for (let i = 0; i < 3; i++) {
-    const child      = spawnChild(null, 1, null)
-    child.id         = `U${shortId}-${child.id}`
+  for (let i = 0; i < 3 - aliveNow; i++) {
+    const child         = spawnChild(null, 1, null)
+    child.id            = `U${shortId}-${child.id}`
     child.walletAddress = deriveChildWalletAddress(child.id, signingKey)
     colony.children.push(child)
     colonyEvent(colony, `Spawned ${child.id} — ${child.genome.specialization}`, 'info')
     registerChild(child, colony)
+    childEarner.startChildEarner(child, earnerOpts)
   }
 }
 
-function runCycle(colony, signingKey) {
+function runCycle(colony, signingKey, earnerOpts) {
   const alive = colony.children.filter(c => c.status === 'alive')
 
   for (const child of alive) {
@@ -145,6 +149,7 @@ function runCycle(colony, signingKey) {
           'success'
         )
         registerChild(offspring, colony)
+        childEarner.startChildEarner(offspring, earnerOpts)
       }
     }
   }
@@ -159,17 +164,24 @@ function runCycle(colony, signingKey) {
 function launchColony(userId) {
   if (instances.has(userId)) return
 
+  const user          = db.findById(userId)
   const signingKey    = deriveUserSigningKey(userId)
   const motherAddress = signingKey ? new ethers.Wallet(signingKey).address : null
   const colony        = makeColony()
   const memory        = makeMemory()
 
-  spawnInitial(colony, userId, signingKey)
-  colonyEvent(colony, 'Colony launched — registering agents with Kite Passport...', 'info')
+  const earnerOpts = {
+    signingKey,
+    atrestApiKey:  user?.atrestApiKey  || null,
+    atrestAgentId: user?.atrestAgentId || null,
+  }
 
-  const cycleId = setInterval(() => runCycle(colony, signingKey), CYCLE_INTERVAL)
+  spawnInitial(colony, userId, signingKey, earnerOpts)
+  colonyEvent(colony, 'Colony launched — agents earning autonomously', 'info')
 
-  instances.set(userId, { colony, memory, cycleId, signingKey, motherAddress })
+  const cycleId = setInterval(() => runCycle(colony, signingKey, earnerOpts), CYCLE_INTERVAL)
+
+  instances.set(userId, { colony, memory, cycleId, signingKey, motherAddress, earnerOpts })
   db.updateStatus(userId, 'running', { colonyLaunchedAt: new Date().toISOString() })
 
   console.log(`[USER-COLONY] Launched colony for user ${userId} | mother=${motherAddress}`)
@@ -248,4 +260,8 @@ function resumeAll() {
   }
 }
 
-module.exports = { launchColony, getColony, getColonyState, watchForDeposit, resumeAll }
+function getAllInstances() {
+  return [...instances.values()]
+}
+
+module.exports = { launchColony, getColony, getColonyState, watchForDeposit, resumeAll, getAllInstances }

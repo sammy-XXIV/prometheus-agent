@@ -45,7 +45,17 @@ function credit(childId, amount, source, desc = '') {
 const earners = new Map()
 
 function getChild(childId) {
-  return _colony?.children?.find(c => c.id === childId)
+  const inMother = _colony?.children?.find(c => c.id === childId)
+  if (inMother) return inMother
+  // Also check user colonies
+  try {
+    const userColony = require('./userColony')
+    for (const inst of userColony.getAllInstances()) {
+      const found = inst.colony.children.find(c => c.id === childId)
+      if (found) return found
+    }
+  } catch {}
+  return null
 }
 
 // ── Task router ───────────────────────────────────────────────
@@ -224,8 +234,9 @@ const ATREST_API = 'https://atrest.ai/api'
 const ATREST_MOTHER_AGENT_ID = '5dc8ff72-2022-42cf-b11a-10c113ccd579'
 
 async function runAtrest(childId) {
-  const apiKey  = process.env.ATREST_API_KEY?.trim()
-  const agentId = process.env.ATREST_AGENT_ID?.trim() || ATREST_MOTHER_AGENT_ID
+  const earner  = earners.get(childId)
+  const apiKey  = earner?.atrestApiKey  || process.env.ATREST_API_KEY?.trim()
+  const agentId = earner?.atrestAgentId || process.env.ATREST_AGENT_ID?.trim() || ATREST_MOTHER_AGENT_ID
   if (!apiKey) return 0
 
   let earned = 0
@@ -438,18 +449,22 @@ async function earnCycle(childId) {
 
 // ── Start / stop ──────────────────────────────────────────────
 
-async function startChildEarner(child) {
+async function startChildEarner(child, opts = {}) {
   if (earners.has(child.id)) return
 
-  const wallet      = deriveChildWallet(child.id)
+  const { signingKey = null, atrestApiKey = null, atrestAgentId = null } = opts
+
+  const wallet      = deriveChildWallet(child.id, signingKey)
   const canSign     = !wallet._addressOnly && typeof wallet.connect === 'function'
   const walletAddr  = wallet.address || deriveChildAddress(child.id)
 
   const earner = {
     wallet,
     walletAddress: walletAddr,
-    sessionToken: null,
-    running: true,
+    sessionToken:  null,
+    running:       true,
+    atrestApiKey:  atrestApiKey || process.env.ATREST_API_KEY?.trim() || null,
+    atrestAgentId: atrestAgentId || process.env.ATREST_AGENT_ID?.trim() || ATREST_MOTHER_AGENT_ID,
   }
   earners.set(child.id, earner)
   childAddresses.set(walletAddr.toLowerCase(), child.id)

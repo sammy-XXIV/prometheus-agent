@@ -63,13 +63,12 @@ function deriveChildAddress(childId) {
 // Returns a wallet for Base-chain signing (Claw Earn) if
 // GAIA_BASE_SIGNING_KEY is available, otherwise returns an address-only
 // object so callers can still read .address without crashing.
-function deriveChildWallet(childId) {
-  const signingKey = (process.env.GAIA_BASE_SIGNING_KEY || process.env.GAIA_BASE_PRIVATE_KEY || '').trim()
-  if (signingKey) {
-    const derived = ethers.id(signingKey + ':child:' + childId)
+function deriveChildWallet(childId, signingKey = null) {
+  const key = signingKey || (process.env.GAIA_BASE_SIGNING_KEY || process.env.GAIA_BASE_PRIVATE_KEY || '').trim()
+  if (key) {
+    const derived = ethers.id(key + ':child:' + childId)
     return new ethers.Wallet(derived)
   }
-  // Address-only — no signing capability
   return { address: deriveChildAddress(childId), _addressOnly: true }
 }
 
