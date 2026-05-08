@@ -438,10 +438,12 @@ html, body {
     <div id="bal-breakdown">
       <div class="bal-row" id="br-m-kite">MTH KITE  <span class="bv">—</span></div>
       <div class="bal-row" id="br-m-base">MTH BASE  <span class="bv">—</span></div>
-      <div class="bal-row" id="br-m-poly">MTH POLY  <span class="bv">—</span></div>
+      <div class="bal-row" id="br-m-pol">MTH POL   <span class="bv">—</span></div>
+      <div class="bal-row" id="br-m-poly">MTH USDC  <span class="bv">—</span></div>
       <div class="bal-divider"></div>
       <div class="bal-row" id="br-c-kite">COL KITE  <span class="bv">—</span></div>
-      <div class="bal-row" id="br-c-poly">COL POLY  <span class="bv">—</span></div>
+      <div class="bal-row" id="br-c-pol">COL POL   <span class="bv">—</span></div>
+      <div class="bal-row" id="br-c-poly">COL USDC  <span class="bv">—</span></div>
     </div>
   </div>
 
@@ -1018,21 +1020,24 @@ async function fetchBalance() {
       '$' + (d.totals?.all ?? 0).toFixed(4)
 
     // Mother breakdown
-    setBalRow('br-m-kite', d.mother?.kite    ?? null)
-    setBalRow('br-m-base', d.mother?.base    ?? null)
-    setBalRow('br-m-poly', d.mother?.polygon ?? null)
+    setBalRow('br-m-kite', d.mother?.kite          ?? null)
+    setBalRow('br-m-base', d.mother?.base          ?? null)
+    setBalRow('br-m-pol',  d.mother?.polygonNative ?? null)
+    setBalRow('br-m-poly', d.mother?.polygonUsdc   ?? null)
 
     // Show NO KEY hint if signing key missing
     if (!d.mother?.hasSigningKey) {
-      const row = document.getElementById('br-m-poly')
-      if (row) row.querySelector('.bv').textContent = 'NO KEY'
+      const noKey = id => { const row = document.getElementById(id); if (row) row.querySelector('.bv').textContent = 'NO KEY' }
+      noKey('br-m-pol'); noKey('br-m-poly')
     }
 
     // Colony totals
-    const childKite = (d.children || []).reduce((s, c) => s + (c.kite || 0), 0)
-    const childPoly = (d.children || []).reduce((s, c) => s + (c.poly || 0), 0)
+    const childKite    = (d.children || []).reduce((s, c) => s + (c.kite || 0), 0)
+    const childPolNat  = (d.children || []).reduce((s, c) => s + (c.polyNative || 0), 0)
+    const childPolUsdc = (d.children || []).reduce((s, c) => s + (c.polyUsdc || 0), 0)
     setBalRow('br-c-kite', childKite)
-    setBalRow('br-c-poly', childPoly)
+    setBalRow('br-c-pol',  childPolNat  || null)
+    setBalRow('br-c-poly', childPolUsdc || null)
   } catch (_) {}
 }
 

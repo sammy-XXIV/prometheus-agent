@@ -347,14 +347,21 @@ app.get('/colony/balances', async (req, res) => {
       })
     }
 
-    // On testnet return native MATIC balance; on mainnet sum USDC + USDC.e
+    // Native POL/MATIC balance
+    async function polyNative(address) {
+      const p = new ethers.JsonRpcProvider(POLY_RPCS[0], { chainId: POLYGON_CHAIN_ID, name: 'polygon' }, { staticNetwork: true })
+      try {
+        const raw = await Promise.race([p.getBalance(address), new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 6000))])
+        return parseFloat(ethers.formatEther(raw))
+      } catch { return null }
+    }
+
+    // USDC balance on Polygon (null on testnet if no USDC contract configured)
     async function polyUSDC(address) {
       if (TESTNET) {
-        const p = new ethers.JsonRpcProvider(POLY_RPCS[0], { chainId: POLYGON_CHAIN_ID, name: 'polygon' }, { staticNetwork: true })
-        try {
-          const raw = await Promise.race([p.getBalance(address), new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 6000))])
-          return parseFloat(ethers.formatEther(raw))
-        } catch { return null }
+        const testUSDC = process.env.AMOY_USDC_ADDRESS || null
+        if (!testUSDC) return null
+        return polyBal(testUSDC, address)
       }
       const [native, bridged] = await Promise.all([
         polyBal(POLY_USDC, address),
@@ -375,11 +382,13 @@ app.get('/colony/balances', async (req, res) => {
     const alive = colony.children.filter(c => c.status === 'alive')
 
     // Query mother wallets + all child wallets in parallel
-    const [kiteM, baseM, polyM] = await Promise.all([
+    const [kiteM, baseM, polyNativeM, polyUsdcM] = await Promise.all([
       bal(kiteProvider, KITE_USDC, MOTHER_ADDRESS),
       baseAddr ? bal(baseProvider, BASE_USDC, baseAddr) : Promise.resolve(null),
-      baseAddr ? polyUSDC(baseAddr) : Promise.resolve(null),
+      baseAddr ? polyNative(baseAddr) : Promise.resolve(null),
+      baseAddr ? polyUSDC(baseAddr)   : Promise.resolve(null),
     ])
+    const polyM = (polyNativeM || 0) + (polyUsdcM || 0) || null
 
     const childBalances = await Promise.all(alive.map(async child => {
       const kiteAddr = child.walletAddress || deriveChildAddress(child.id)
@@ -387,18 +396,19 @@ app.get('/colony/balances', async (req, res) => {
       if (sigKey) {
         try { polyAddr = new ethers.Wallet(ethers.id(sigKey + ':child:' + child.id)).address } catch {}
       }
-      const [kite, poly] = await Promise.all([
+      const [kite, polNative, polUsdc] = await Promise.all([
         bal(kiteProvider, KITE_USDC, kiteAddr),
-        polyAddr ? polyUSDC(polyAddr) : Promise.resolve(null),
+        polyAddr ? polyNative(polyAddr) : Promise.resolve(null),
+        polyAddr ? polyUSDC(polyAddr)   : Promise.resolve(null),
       ])
-      return { id: child.id, kiteAddr, polyAddr, kite, poly }
+      return { id: child.id, kiteAddr, polyAddr, kite, poly: (polNative || 0) + (polUsdc || 0), polyNative: polNative, polyUsdc: polUsdc }
     }))
 
     const childKite = childBalances.reduce((s, c) => s + (c.kite || 0), 0)
     const childPoly = childBalances.reduce((s, c) => s + (c.poly || 0), 0)
 
     _balanceCache = {
-      mother:   { address: MOTHER_ADDRESS, baseAddress: baseAddr, hasSigningKey: !!sigKey, kite: kiteM, base: baseM, polygon: polyM },
+      mother:   { address: MOTHER_ADDRESS, baseAddress: baseAddr, hasSigningKey: !!sigKey, kite: kiteM, base: baseM, polygon: polyM, polygonNative: polyNativeM, polygonUsdc: polyUsdcM },
       children: childBalances,
       totals: {
         kite:    parseFloat(((kiteM || 0) + childKite).toFixed(6)),
@@ -526,6 +536,33 @@ app.post('/data',           paymentWall('data'),            async (req, res) => 
 app.post('/news',           paymentWall('news'),            async (req, res) => { try { res.json({ result: await services.newsSentiment(req.body.news) }) } catch(e) { res.status(500).json({ error: e.message }) }})
 app.post('/sentiment',      paymentWall('sentiment'),       async (req, res) => { try { res.json({ result: await services.sentiment(req.body.text) }) } catch(e) { res.status(500).json({ error: e.message }) }})
 app.post('/advice',         paymentWall('advice'),          async (req, res) => { try { res.json({ result: await services.advice(req.body.topic) }) } catch(e) { res.status(500).json({ error: e.message }) }})
+
+// ── Polymarket test — force one child to run a full trade cycle ───────────────
+// Protected by SWEEP_SECRET. Call: POST /test-poly {"secret":"...","childId":"GAIA-G1-XXXX"}
+app.post('/test-poly', async (req, res) => {
+  const secret = (process.env.TEST_SECRET || process.env.SWEEP_SECRET || '').trim()
+  if (!secret || req.body.secret !== secret) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  try {
+    const { colony } = require('./gaia')
+    const polymarket = require('./polymarket')
+    const childId = req.body.childId
+    const child = colony.children?.find(c => c.id === childId && c.status === 'alive')
+    if (!child) return res.status(404).json({ error: `No alive child with id ${childId}` })
+
+    const logs = []
+    const origLog = console.log
+    console.log = (...args) => { const line = args.join(' '); if (line.includes('[POLY]')) logs.push(line); origLog(...args) }
+
+    await polymarket.runForChild(child)
+
+    console.log = origLog
+    res.json({ childId, logs })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
 
 // ── Polygon sweep — drain all children's Polygon USDC to mother ──────────────
 // Protected by SWEEP_SECRET env var. Call: POST /sweep-polygon {"secret":"..."}

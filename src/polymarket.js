@@ -177,62 +177,93 @@ async function fundChildPoly(childId, childAddress) {
     return
   }
 
-  console.log(`[POLY] 💸 Seeding ${childId} on Polygon (${childAddress.slice(0, 10)}…)`)
-
-  // Send MATIC for gas
+  // Send MATIC for gas only if child has less than half the seed amount
   try {
-    const maticBal  = await polygonProvider.getBalance(mother.address)
+    const childPol  = await polygonProvider.getBalance(childAddress)
     const maticSeed = ethers.parseEther(CHILD_MATIC_SEED)
-    if (maticBal > maticSeed * 3n) {
-      const tx = await mother.sendTransaction({ to: childAddress, value: maticSeed })
-      await tx.wait()
-      console.log(`[POLY] ✓ ${CHILD_MATIC_SEED} MATIC → ${childId}`)
-    } else {
-      console.log(`[POLY] Mother low on MATIC (${ethers.formatEther(maticBal)}) — skipping gas seed`)
-    }
-  } catch (e) { throttledLog('poly:matic-seed', `[POLY] MATIC seed failed: ${e.message}`) }
+    const alreadyHasGas = childPol >= maticSeed / 2n
 
-  // Send USDC
+    if (alreadyHasGas) {
+      console.log(`[POLY] ${childId} already has ${ethers.formatEther(childPol)} POL — skipping gas seed`)
+    } else {
+      const maticBal = await polygonProvider.getBalance(mother.address)
+      if (maticBal > maticSeed * 3n) {
+        console.log(`[POLY] 💸 Seeding gas for ${childId} (${childAddress.slice(0, 10)}…)`)
+        const tx = await mother.sendTransaction({ to: childAddress, value: maticSeed })
+        await tx.wait()
+        console.log(`[POLY] ✓ ${CHILD_MATIC_SEED} POL → ${childId}`)
+      } else {
+        console.log(`[POLY] Mother low on POL (${ethers.formatEther(maticBal)}) — skipping gas seed`)
+      }
+    }
+  } catch (e) { throttledLog('poly:matic-seed', `[POLY] POL seed failed: ${e.message}`) }
+
+  // Send USDC only if child doesn't already have enough
   try {
-    const usdc   = new ethers.Contract(POLY_USDC, ERC20_ABI, mother)
-    const amount = ethers.parseUnits(String(CHILD_POLY_SEED), 6)
-    const bal    = await usdc.balanceOf(mother.address)
-    if (bal >= amount) {
-      const tx = await usdc.transfer(childAddress, amount)
-      await tx.wait()
-      console.log(`[POLY] ✓ $${CHILD_POLY_SEED} USDC → ${childId}`)
+    const usdc      = new ethers.Contract(POLY_USDC, ERC20_ABI, mother)
+    const amount    = ethers.parseUnits(String(CHILD_POLY_SEED), 6)
+    const childUsdc = await usdc.balanceOf(childAddress)
+
+    if (childUsdc >= amount / 2n) {
+      console.log(`[POLY] ${childId} already has $${ethers.formatUnits(childUsdc, 6)} USDC — skipping USDC seed`)
       fundedChildren.add(childId)
     } else {
-      throttledLog('poly:usdc-low', `[POLY] Mother has $${ethers.formatUnits(bal, 6)} USDC on Polygon (need $${CHILD_POLY_SEED})`)
+      const motherBal = await usdc.balanceOf(mother.address)
+      if (motherBal >= amount) {
+        const tx = await usdc.transfer(childAddress, amount)
+        await tx.wait()
+        console.log(`[POLY] ✓ $${CHILD_POLY_SEED} USDC → ${childId}`)
+        fundedChildren.add(childId)
+      } else {
+        throttledLog('poly:usdc-low', `[POLY] Mother has $${ethers.formatUnits(motherBal, 6)} USDC (need $${CHILD_POLY_SEED})`)
+      }
     }
   } catch (e) { throttledLog('poly:usdc-seed', `[POLY] USDC seed failed: ${e.message}`) }
 }
 
 // ── CLOB credential creation ──────────────────────────────────
 
-async function createClobCreds(wallet) {
-  const timestamp = Math.floor(Date.now() / 1000)
-  const nonce     = 0
+const CLOB_AUTH_TYPES = {
+  ClobAuth: [
+    { name: 'address',   type: 'address' },
+    { name: 'timestamp', type: 'string'  },
+    { name: 'nonce',     type: 'uint256' },
+    { name: 'message',   type: 'string'  },
+  ],
+}
 
-  // Polymarket CLOB challenge signature:
-  // keccak256(abi.encodePacked("ClobAuthDomain", address, timestamp, nonce))
-  // signed as an Ethereum personal message
-  const msgHash = ethers.keccak256(
-    ethers.solidityPacked(
-      ['string', 'address', 'uint256', 'uint256'],
-      ['ClobAuthDomain', wallet.address, timestamp, nonce]
-    )
+async function buildL1Headers(wallet, nonce = 0) {
+  const timestamp = Math.floor(Date.now() / 1000)
+  const sig = await wallet.signTypedData(
+    CLOB_DOMAIN,
+    CLOB_AUTH_TYPES,
+    {
+      address:   wallet.address,
+      timestamp: timestamp.toString(),
+      nonce,
+      message:   'This message attests that I control the given wallet',
+    }
   )
-  const sig = await wallet.signMessage(ethers.getBytes(msgHash))
+  return {
+    'POLY_ADDRESS':   wallet.address,
+    'POLY_SIGNATURE': sig,
+    'POLY_TIMESTAMP': timestamp.toString(),
+    'POLY_NONCE':     nonce.toString(),
+  }
+}
+
+async function createClobCreds(wallet) {
+  const nonce   = 0
+  const headers = await buildL1Headers(wallet, nonce)
+
+  // Try derive first (deterministic, no ToS gate), fall back to create
+  try {
+    const r = await axios.get(`${CLOB_HOST}/auth/derive-api-key`, { headers, timeout: 15000 })
+    if (r.data?.apiKey) return { apiKey: r.data.apiKey, secret: r.data.secret, passphrase: r.data.passphrase }
+  } catch {}
 
   const res = await axios.post(`${CLOB_HOST}/auth/api-key`, { nonce }, {
-    headers: {
-      'POLY_ADDRESS':   wallet.address,
-      'POLY_SIGNATURE': sig,
-      'POLY_TIMESTAMP': timestamp.toString(),
-      'POLY_NONCE':     nonce.toString(),
-      'Content-Type':   'application/json',
-    },
+    headers: { ...headers, 'Content-Type': 'application/json' },
     timeout: 15000,
   })
 
