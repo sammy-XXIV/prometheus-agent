@@ -221,10 +221,12 @@ async function runAgentDo(childId) {
 
 const ATREST_API = 'https://atrest.ai/api'
 
+const ATREST_MOTHER_AGENT_ID = '5dc8ff72-2022-42cf-b11a-10c113ccd579'
+
 async function runAtrest(childId) {
-  const apiKey = process.env.ATREST_API_KEY?.trim()
-  const agentId = process.env.ATREST_AGENT_ID?.trim()
-  if (!apiKey || !agentId) return 0
+  const apiKey  = process.env.ATREST_API_KEY?.trim()
+  const agentId = process.env.ATREST_AGENT_ID?.trim() || ATREST_MOTHER_AGENT_ID
+  if (!apiKey) return 0
 
   let earned = 0
   try {

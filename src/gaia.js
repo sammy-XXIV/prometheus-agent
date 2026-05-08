@@ -96,7 +96,13 @@ function startEarner(child) {
 }
 
 function spawnInitialChildren(count = 3) {
-  for (let i = 0; i < count; i++) {
+  const aliveNow = colony.children.filter(c => c.status === 'alive').length
+  if (aliveNow >= count) {
+    console.log(`[GENESIS] ${aliveNow} children already alive — skipping initial spawn`)
+    return
+  }
+  const toSpawn = count - aliveNow
+  for (let i = 0; i < toSpawn; i++) {
     const child = spawnChild(null, 1, null)
     colony.children.push(child)
     startEarner(child)
@@ -180,16 +186,21 @@ async function runColonyCycle() {
       colony.reproduced++
       colony.generation = Math.max(colony.generation, child.generation + 1)
       const aliveNow = colony.children.filter(c => c.status === 'alive').length
-      if (aliveNow < MAX_COLONY_SIZE) {
+      const motherUsdc = await getBalance().catch(() => 0)
+      const minSeed = child.genome.seedAmount || 1
+      if (aliveNow < MAX_COLONY_SIZE && motherUsdc >= minSeed) {
         const offspring = spawnChild(child.genome, child.generation + 1, child.id, child.knowledge)
         colony.children.push(offspring)
         startEarner(offspring)
         const knSummary = knowledge.summary(offspring.knowledge)
         console.log(`[EVOLUTION] ${child.id} reproduced -> ${offspring.id} | ${knSummary}`)
         colonyEvent(`${child.id.replace('GAIA-','')} reproduced -> ${offspring.id.replace('GAIA-','')} (Gen ${offspring.generation})`, 'success')
-      } else {
+      } else if (aliveNow >= MAX_COLONY_SIZE) {
         console.log(`[EVOLUTION] ${child.id} reproduced but colony full (${aliveNow}/${MAX_COLONY_SIZE})`)
         colonyEvent(`${child.id.replace('GAIA-','')} reproduced — colony at capacity`, 'warn')
+      } else {
+        console.log(`[EVOLUTION] ${child.id} reproduced but mother has insufficient USDC ($${motherUsdc.toFixed(2)}) to seed offspring`)
+        colonyEvent(`${child.id.replace('GAIA-','')} reproduced — mother unfunded, offspring held`, 'warn')
       }
     }
   }
@@ -258,7 +269,8 @@ function thrivingMode() {
   colonyEvent(`Generation ${colony.generation} — Premium Analysis unlocked`, 'success')
 
   const aliveNow = colony.children.filter(c => c.status === 'alive').length
-  if (aliveNow < MAX_COLONY_SIZE) {
+  const motherUsdc = await getBalance().catch(() => 0)
+  if (aliveNow < MAX_COLONY_SIZE && motherUsdc >= 1.0) {
     const child = spawnChild(null, colony.generation, null)
     colony.children.push(child)
     startEarner(child)
