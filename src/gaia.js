@@ -260,7 +260,7 @@ function growthMode() {
   if (best) console.log(`[GROWTH] Top service: ${best[0]} (${best[1]} calls)`)
 }
 
-function thrivingMode() {
+async function thrivingMode() {
   config.services.premium_analysis = {
     price: '0.50',
     description: 'Deep analysis - Premium tier (GAIA evolved)',
@@ -293,7 +293,7 @@ async function think(balance) {
     case 'dying':
     case 'critical': emergencySurvival(); break
     case 'growth':   growthMode();        break
-    case 'thriving': thrivingMode();      break
+    case 'thriving': await thrivingMode(); break
   }
 
   await runColonyCycle()
