@@ -471,14 +471,15 @@ html, body {
     </div>
   </div>
 
-  <div id="control-bar" class="pixel-panel">
-    <button class="ctrl-btn" id="btn-drain" onclick="drainPOL()">⬇ DRAIN POL</button>
-    <button class="ctrl-btn" id="btn-seed-toggle" onclick="toggleSeed()">⏸ PAUSE SEED</button>
-  </div>
-
   <div id="event-log">
     <span id="event-log-title">// EVENT LOG</span>
   </div>
+</div>
+
+<!-- Control bar lives OUTSIDE #hud so pointer-events work unconditionally -->
+<div id="control-bar" class="pixel-panel">
+  <button class="ctrl-btn" id="btn-drain" onclick="drainPOL()">⬇ DRAIN POL</button>
+  <button class="ctrl-btn" id="btn-seed-toggle" onclick="toggleSeed()">⏸ PAUSE SEED</button>
 </div>
 
 <div id="tip">
