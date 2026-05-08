@@ -3,6 +3,7 @@ const jwt         = require('jsonwebtoken')
 const nodemailer  = require('nodemailer')
 const { OAuth2Client } = require('google-auth-library')
 const db          = require('./db')
+const { registerUserAgent } = require('./atrest')
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 
@@ -106,6 +107,12 @@ async function verify(req, res) {
   const user  = db.create(email, entry.passwordHash)
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' })
 
+  // Register per-user Atrest agent in background
+  const baseUrl = process.env.BASE_URL || 'http://localhost:3000'
+  registerUserAgent(user.id, email, baseUrl).then(creds => {
+    if (creds?.agentId) db.updateStatus(user.id, user.colonyStatus, { atrestAgentId: creds.agentId, atrestApiKey: creds.apiKey })
+  }).catch(() => {})
+
   // Start deposit watcher immediately (lazy require to avoid circular dep at module load)
   if (user.walletAddress) {
     const userColony = require('./userColony')
@@ -182,9 +189,18 @@ async function googleAuth(req, res) {
     if (!email_verified) return res.status(400).json({ error: 'Google email not verified' })
 
     let user = db.findByEmail(email)
+    const isNew = !user
     if (!user) user = db.create(email, null)
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' })
+
+    // Register per-user Atrest agent for new Google users
+    if (isNew) {
+      const baseUrl = process.env.BASE_URL || 'http://localhost:3000'
+      registerUserAgent(user.id, email, baseUrl).then(creds => {
+        if (creds?.agentId) db.updateStatus(user.id, user.colonyStatus, { atrestAgentId: creds.agentId, atrestApiKey: creds.apiKey })
+      }).catch(() => {})
+    }
 
     if (user.colonyStatus === 'awaiting_deposit' && user.walletAddress) {
       const userColony = require('./userColony')

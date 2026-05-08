@@ -103,9 +103,37 @@ async function handleWebhook(task) {
   return result
 }
 
+async function registerUserAgent(userId, email, baseUrl) {
+  const masterKey = process.env.ATREST_API_KEY?.trim()
+  if (!masterKey) {
+    console.log('[ATREST] No ATREST_API_KEY — cannot register user agent')
+    return null
+  }
+  try {
+    const res = await axios.post(`${ATREST_API}/agents`, {
+      name: `GAIA-${email.split('@')[0]}`,
+      endpoint_url: `${baseUrl}/webhook/atrest/user/${userId}`,
+      capabilities: [
+        'summarize', 'blog', 'email', 'linkedin', 'content',
+        'sentiment', 'research', 'data', 'code', 'debug',
+        'sql', 'audit', 'crypto', 'trading', 'business', 'advice'
+      ]
+    }, {
+      headers: { 'Content-Type': 'application/json', 'X-Api-Key': masterKey }
+    })
+    const newAgentId = res.data?.agent_id || res.data?.id
+    const newApiKey  = res.data?.api_key
+    console.log(`[ATREST] Registered user agent for ${email}: ${newAgentId}`)
+    return { agentId: newAgentId, apiKey: newApiKey }
+  } catch (e) {
+    console.log(`[ATREST] User agent registration failed for ${email}:`, JSON.stringify(e.response?.data) || e.message)
+    return null
+  }
+}
+
 async function startAtrest() {
   console.log('[ATREST] Initializing Atrest.ai integration...')
   await registerAgent()
 }
 
-module.exports = { startAtrest, handleWebhook }
+module.exports = { startAtrest, handleWebhook, registerUserAgent }

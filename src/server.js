@@ -78,6 +78,21 @@ app.post('/webhook/atrest', async (req, res) => {
   }
 })
 
+// Per-user webhook — tasks routed to a specific user's colony
+app.post('/webhook/atrest/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params
+    const user = db.findById(userId)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    const result = await atrestWebhook(req.body)
+    if (!result) return res.status(422).json({ error: 'Could not process task' })
+    res.json({ result, userId })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // Per-child webhook — each child can register its own Atrest endpoint
 app.post('/webhook/atrest/:childId', async (req, res) => {
   try {
