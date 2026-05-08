@@ -218,6 +218,29 @@ html, body {
   margin: 2px 0;
 }
 
+/* Control bar — bottom left above event log */
+#control-bar {
+  position: absolute;
+  bottom: 90px; left: 14px;
+  display: flex;
+  gap: 6px;
+}
+
+.ctrl-btn {
+  font-family: var(--font);
+  font-size: 5px;
+  color: var(--green);
+  background: rgba(4,4,14,0.92);
+  border: 1px solid var(--green);
+  padding: 5px 8px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: background 0.1s;
+}
+.ctrl-btn:hover { background: rgba(0,238,119,0.15); }
+.ctrl-btn.paused { color: var(--amber); border-color: var(--amber); }
+.ctrl-btn.busy   { opacity: 0.5; pointer-events: none; }
+
 /* Event log — bottom ticker */
 #event-log {
   position: absolute;
@@ -445,6 +468,11 @@ html, body {
       <div class="bal-row" id="br-c-pol">COL POL   <span class="bv">—</span></div>
       <div class="bal-row" id="br-c-poly">COL USDC  <span class="bv">—</span></div>
     </div>
+  </div>
+
+  <div id="control-bar" class="pixel-panel">
+    <button class="ctrl-btn" id="btn-drain" onclick="drainPOL()">⬇ DRAIN POL</button>
+    <button class="ctrl-btn" id="btn-seed-toggle" onclick="toggleSeed()">⏸ PAUSE SEED</button>
   </div>
 
   <div id="event-log">
@@ -993,6 +1021,50 @@ async function fetchColony() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// CONTROL BUTTONS
+
+async function drainPOL() {
+  const btn = document.getElementById('btn-drain')
+  btn.classList.add('busy')
+  btn.textContent = '⏳ DRAINING…'
+  try {
+    const r = await fetch('/colony/drain-pol', { method: 'POST' })
+    const d = await r.json()
+    btn.textContent = `✓ DRAINED ${parseFloat(d.totalDrained||0).toFixed(4)} POL`
+    setTimeout(() => { btn.textContent = '⬇ DRAIN POL'; btn.classList.remove('busy') }, 4000)
+  } catch {
+    btn.textContent = '✗ FAILED'
+    setTimeout(() => { btn.textContent = '⬇ DRAIN POL'; btn.classList.remove('busy') }, 3000)
+  }
+}
+
+async function toggleSeed() {
+  const btn = document.getElementById('btn-seed-toggle')
+  btn.classList.add('busy')
+  try {
+    const r = await fetch('/colony/poly-seed/toggle', { method: 'POST' })
+    const d = await r.json()
+    updateSeedBtn(d.polySeedPaused)
+  } catch {}
+  btn.classList.remove('busy')
+}
+
+function updateSeedBtn(paused) {
+  const btn = document.getElementById('btn-seed-toggle')
+  if (paused) { btn.textContent = '▶ RESUME SEED'; btn.classList.add('paused') }
+  else        { btn.textContent = '⏸ PAUSE SEED';  btn.classList.remove('paused') }
+}
+
+// Sync seed status on load
+async function fetchSeedStatus() {
+  try {
+    const r = await fetch('/colony/poly-seed/status')
+    const d = await r.json()
+    updateSeedBtn(d.polySeedPaused)
+  } catch {}
+}
+
+// ═══════════════════════════════════════════════════════════════
 // BALANCE FETCH
 // ═══════════════════════════════════════════════════════════════
 
@@ -1061,6 +1133,7 @@ setSVG(document.getElementById('gaia-sprite'), GAIA_MAP, GAIA_COLORS, PS2)
 requestAnimationFrame(animLoop)
 fetchColony()
 fetchBalance()
+fetchSeedStatus()
 setInterval(fetchBalance, 30000)
 </script>
 </body>

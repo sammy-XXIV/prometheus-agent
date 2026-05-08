@@ -171,6 +171,7 @@ async function getPolyUSDCBalance(address) {
 
 async function fundChildPoly(childId, childAddress) {
   if (fundedChildren.has(childId)) return
+  try { if (require('./server')._polySeedPaused) { console.log('[POLY] Seed paused — skipping'); return } } catch {}
   const mother = motherPolyWallet()
   if (!mother) {
     console.log('[POLY] GAIA_BASE_SIGNING_KEY not set — cannot fund child on Polygon')

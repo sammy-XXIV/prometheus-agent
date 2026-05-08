@@ -297,6 +297,7 @@ app.get('/colony/fossils', (req, res) => {
 // Multi-chain balance snapshot — mother + all alive children across Kite/Base/Polygon
 let _balanceCache = null
 let _balanceCacheAt = 0
+let _polySeedPaused = false
 const BALANCE_CACHE_MS = 25000
 if (TESTNET) { _balanceCache = null; _balanceCacheAt = 0 }
 
@@ -536,6 +537,52 @@ app.post('/data',           paymentWall('data'),            async (req, res) => 
 app.post('/news',           paymentWall('news'),            async (req, res) => { try { res.json({ result: await services.newsSentiment(req.body.news) }) } catch(e) { res.status(500).json({ error: e.message }) }})
 app.post('/sentiment',      paymentWall('sentiment'),       async (req, res) => { try { res.json({ result: await services.sentiment(req.body.text) }) } catch(e) { res.status(500).json({ error: e.message }) }})
 app.post('/advice',         paymentWall('advice'),          async (req, res) => { try { res.json({ result: await services.advice(req.body.topic) }) } catch(e) { res.status(500).json({ error: e.message }) }})
+
+// ── Colony control — drain POL + toggle poly seed ────────────────────────────
+
+app.post('/colony/drain-pol', async (req, res) => {
+  try {
+    const { ethers } = require('ethers')
+    const { polygonProvider } = require('./rpcProvider')
+    const { colony } = require('./gaia')
+    const signingKey = (process.env.GAIA_BASE_SIGNING_KEY || '').trim()
+    if (!signingKey) return res.status(500).json({ error: 'No signing key' })
+
+    const MOTHER   = '0x7B60394f9FC96eD4d7ba7BE396E5315513fb6fA4'
+    const GAS_LIMIT = 21000n
+    const children  = colony.children || []
+    const results   = []
+    let total = 0n
+
+    for (const child of children) {
+      const wallet = new ethers.Wallet(ethers.id(signingKey + ':child:' + child.id), polygonProvider)
+      const bal    = await polygonProvider.getBalance(wallet.address)
+      if (bal === 0n) { results.push({ id: child.id, sent: '0' }); continue }
+      const feeData = await polygonProvider.getFeeData()
+      const gasPrice = feeData.gasPrice * 120n / 100n
+      const sendAmt  = bal - GAS_LIMIT * gasPrice
+      if (sendAmt <= 0n) { results.push({ id: child.id, sent: '0', reason: 'too low' }); continue }
+      const tx = await wallet.sendTransaction({ to: MOTHER, value: sendAmt, gasLimit: GAS_LIMIT, gasPrice })
+      await tx.wait()
+      total += sendAmt
+      results.push({ id: child.id, sent: ethers.formatEther(sendAmt), tx: tx.hash })
+    }
+
+    res.json({ ok: true, totalDrained: ethers.formatEther(total), children: results })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+app.post('/colony/poly-seed/toggle', (req, res) => {
+  _polySeedPaused = !_polySeedPaused
+  console.log(`[COLONY] Poly seed ${_polySeedPaused ? 'PAUSED' : 'RESUMED'} via dashboard`)
+  res.json({ polySeedPaused: _polySeedPaused })
+})
+
+app.get('/colony/poly-seed/status', (req, res) => {
+  res.json({ polySeedPaused: _polySeedPaused })
+})
 
 // ── Polymarket test — force one child to run a full trade cycle ───────────────
 // Protected by SWEEP_SECRET. Call: POST /test-poly {"secret":"...","childId":"GAIA-G1-XXXX"}
