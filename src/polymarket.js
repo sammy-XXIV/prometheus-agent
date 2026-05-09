@@ -43,7 +43,7 @@ const MIN_BET          = 0.10
 const MAX_BET          = 0.50
 const KELLY_FRACTION   = 0.02
 const MAX_EXPOSURE     = 0.20
-const MIN_EDGE         = 0.08
+const MIN_EDGE         = 0.05
 const CHILD_POLY_SEED  = 1.00   // USDC to seed each child's Polygon wallet
 const CHILD_MATIC_SEED = '0.05' // MATIC for gas
 const MAX_MARKETS      = 8
@@ -555,7 +555,7 @@ CONFIDENCE: [LOW|MEDIUM|HIGH]
 REASONING: [2 sentences of concrete evidence]
 RECOMMENDATION: [BET_YES|BET_NO|SKIP]
 
-Only BET_YES/BET_NO if ALL true: (1) probability differs >15pp from market, (2) HIGH confidence, (3) concrete recent evidence. When in doubt → SKIP`
+Only BET_YES/BET_NO if ALL true: (1) probability differs >8pp from market, (2) HIGH or MEDIUM confidence, (3) concrete recent evidence. When in doubt → SKIP`
 
   try {
     const msg = await anthropic.messages.create({
