@@ -63,7 +63,8 @@ const ERC20_ABI = [
   'function allowance(address owner, address spender) view returns (uint256)',
 ]
 
-const CLOB_DOMAIN = { name: 'ClobAuthDomain', version: '1', chainId: POLYGON_CHAIN }
+const CLOB_DOMAIN  = { name: 'ClobAuthDomain', version: '1', chainId: POLYGON_CHAIN }
+const ORDER_DOMAIN = { name: 'Polymarket CTF Exchange', version: '1', chainId: POLYGON_CHAIN, verifyingContract: CTF_EXCHANGE }
 
 const ORDER_TYPES = [
   { name: 'salt',          type: 'uint256' },
@@ -384,12 +385,12 @@ async function placeClobOrder(market, side, stakeUSDC, childId) {
       signatureType: 0n,   // EOA
     }
 
-    const signature = await wallet.signTypedData(CLOB_DOMAIN, { Order: ORDER_TYPES }, order)
+    const signature = await wallet.signTypedData(ORDER_DOMAIN, { Order: ORDER_TYPES }, order)
 
     const body = JSON.stringify({
       order: Object.fromEntries(Object.entries(order).map(([k, v]) => [k, v.toString()])),
       signature,
-      orderType: 'FOK',
+      orderType: 'GTC',
     })
 
     const headers = buildClobAuthHeaders(creds, 'POST', '/order', body)
