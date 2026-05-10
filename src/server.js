@@ -682,6 +682,25 @@ app.get('/colony/poly-seed/status', (req, res) => {
   res.json({ polySeedPaused: _polySeedPaused })
 })
 
+// ── Fund child Polygon wallets now (USDC + MATIC from mother) ────────────────
+
+app.post('/colony/fund-poly', async (req, res) => {
+  try {
+    const { colony } = require('./gaia')
+    const poly = require('./polymarket')
+    const alive = (colony.children || []).filter(c => c.status === 'alive')
+    if (!alive.length) return res.status(404).json({ error: 'No alive children' })
+    const results = []
+    for (const child of alive) {
+      await poly.seedChild(child)
+      results.push({ id: child.id, wallet: child.walletAddress })
+    }
+    res.json({ funded: results })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // ── Polymarket test — force one child to run a full trade cycle ───────────────
 // Protected by SWEEP_SECRET. Call: POST /test-poly {"secret":"...","childId":"GAIA-G1-XXXX"}
 app.post('/test-poly', async (req, res) => {
