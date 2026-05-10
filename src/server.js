@@ -688,14 +688,42 @@ app.post('/colony/fund-poly', async (req, res) => {
   try {
     const { colony } = require('./gaia')
     const poly = require('./polymarket')
+    const { polygonProvider } = require('./rpcProvider')
+    const { ethers } = require('ethers')
+
+    const sigKey = (process.env.GAIA_BASE_SIGNING_KEY || '').trim()
+    const POLY_USDC = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
+    const ERC20_ABI = ['function balanceOf(address) view returns (uint256)', 'function transfer(address,uint256) returns (bool)']
+
+    // Derive mother address from signing key
+    let motherAddr = null
+    let motherMatic = '0'
+    let motherUsdc  = '0'
+    if (sigKey) {
+      try {
+        const mw = new ethers.Wallet(sigKey, polygonProvider)
+        motherAddr = mw.address
+        motherMatic = ethers.formatEther(await polygonProvider.getBalance(mw.address))
+        const usdc = new ethers.Contract(POLY_USDC, ERC20_ABI, polygonProvider)
+        motherUsdc = ethers.formatUnits(await usdc.balanceOf(mw.address), 6)
+      } catch (e) { motherAddr = 'KEY_ERROR: ' + e.message }
+    } else {
+      motherAddr = 'GAIA_BASE_SIGNING_KEY_NOT_SET'
+    }
+
     const alive = (colony.children || []).filter(c => c.status === 'alive')
-    if (!alive.length) return res.status(404).json({ error: 'No alive children' })
     const results = []
     for (const child of alive) {
       await poly.seedChild(child)
       results.push({ id: child.id, wallet: child.walletAddress })
     }
-    res.json({ funded: results })
+
+    res.json({
+      motherDerivedAddress: motherAddr,
+      motherMatic,
+      motherUsdc,
+      funded: results,
+    })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
