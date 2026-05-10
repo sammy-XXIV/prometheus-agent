@@ -21,9 +21,12 @@ const { kiteProvider, baseProvider, throttledLog } = require('./rpcProvider')
 const KPASS_BIN = process.env.KPASS_BIN ||
   path.join(process.env.HOME || '', '.local/bin/kpass')
 
-const KITE_USDC      = '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e'
-const BASE_USDC      = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
-const MOTHER_ADDRESS = '0x9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'  // Kite AA wallet (correct for Kite chain drains)
+const KITE_USDC        = '0x7aB6f3ed87C42eF0aDb67Ed95090f8bF5240149e'
+const BASE_USDC        = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
+const MOTHER_ADDRESS   = '0x9BeD7776262076B016798d6Ee74Dea3a6B1Ac662'  // Kite AA wallet (correct for Kite chain drains)
+const MOTHER_POLYGON   = '0x7B60394f9FC96eD4d7ba7BE396E5315513fb6fA4'  // Polygon EOA — receives Polygon USDC on death
+const POLY_USDC        = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
+const POLY_USDC_E      = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
 
 const ERC20_ABI = [
   'function balanceOf(address) view returns (uint256)',
@@ -134,6 +137,31 @@ async function fundChild(childAddress, amountUSDC) {
 async function drainToMother(childId) {
   let total = 0
   const childAddr = deriveChildAddress(childId)
+
+  // ── Polygon USDC drain (native + bridged) ─────────────────────
+  try {
+    const signingKey = (process.env.GAIA_BASE_SIGNING_KEY || '').trim()
+    if (signingKey) {
+      const { polygonProvider } = require('./rpcProvider')
+      const privKey = ethers.id(signingKey + ':child:' + childId)
+      const wallet  = new ethers.Wallet(privKey, polygonProvider)
+
+      for (const [label, tokenAddr] of [[' Polygon USDC', POLY_USDC], ['Polygon USDC.e', POLY_USDC_E]]) {
+        try {
+          const token = new ethers.Contract(tokenAddr, ERC20_ABI, wallet)
+          const bal   = await token.balanceOf(wallet.address)
+          const amt   = parseFloat(ethers.formatUnits(bal, 6))
+          if (amt < 0.001) continue
+          const tx = await token.transfer(MOTHER_POLYGON, bal, { gasLimit: 100_000n })
+          await tx.wait()
+          total += amt
+          console.log(`[WALLET] ✓ ${childId} drained $${amt.toFixed(4)} ${label} → mother`)
+        } catch {}
+      }
+    }
+  } catch (e) {
+    console.log(`[WALLET] Polygon drain error for ${childId}:`, e.message)
+  }
 
   // ── Kite drain via child's kpass session ─────────────────────
   try {
