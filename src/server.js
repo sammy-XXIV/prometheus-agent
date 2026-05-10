@@ -571,6 +571,33 @@ app.post('/colony/spawn-one', (req, res) => {
   }
 })
 
+// ── Kill child + spawn replacement ───────────────────────────────────────────
+
+app.post('/colony/replace', (req, res) => {
+  try {
+    const { colony, startEarner } = require('./gaia')
+    const { spawnChild } = require('./spawn')
+    const childId = req.body?.childId
+    const target  = childId
+      ? colony.children.find(c => c.id === childId)
+      : colony.children.filter(c => c.status === 'alive')
+          .sort((a, b) => a.totalEarned - b.totalEarned)[0]
+
+    if (!target) return res.status(404).json({ error: 'No child found to kill' })
+
+    target.status = 'dead'
+    console.log(`[MANUAL] Killed ${target.id}`)
+
+    const child = spawnChild(null, 1, null)
+    colony.children.push(child)
+    startEarner(child)
+    console.log(`[MANUAL] Spawned replacement ${child.id} — wallet: ${child.walletAddress}`)
+    res.json({ killed: target.id, spawned: child.id, wallet: child.walletAddress })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // ── Polymarket positions ──────────────────────────────────────────────────────
 
 app.get('/colony/positions', (req, res) => {
