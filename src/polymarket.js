@@ -438,42 +438,26 @@ async function fetchMarkets() {
 
 // ── Research ──────────────────────────────────────────────────
 
-async function searchSerpAPI(query) {
-  const key = (process.env.SERPAPI_KEY || '').trim()
+async function searchTavily(query) {
+  const key = (process.env.TAVILY_API_KEY || '').trim()
   if (!key) return []
   try {
-    const res = await axios.get('https://serpapi.com/search.json', {
-      params: { q: query, api_key: key, num: 4, hl: 'en', gl: 'us' },
-      timeout: 10000,
-    })
-    return (res.data?.organic_results || []).map(r => ({
-      url: r.link, title: r.title, snippet: r.snippet || '',
-    }))
-  } catch { return [] }
-}
-
-async function searchDDG(query) {
-  try {
-    const res = await axios.get('https://html.duckduckgo.com/html/', {
-      params: { q: query },
-      headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36' },
-      timeout: 10000,
-    })
-    const html = res.data || ''
-    const results = [], snippets = []
-    const linkRe    = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([^<]+)<\/a>/gi
-    const snippetRe = /<a[^>]+class="result__snippet"[^>]*>([^<]+)<\/a>/gi
-    let m
-    while ((m = snippetRe.exec(html)) !== null && snippets.length < 6) snippets.push(m[1].trim())
-    let si = 0
-    while ((m = linkRe.exec(html)) !== null && results.length < 4) {
-      let url = m[1]
-      if (url.startsWith('//duckduckgo.com/l/?uddg=')) url = decodeURIComponent(url.replace('//duckduckgo.com/l/?uddg=', 'https://'))
-      if (!url.startsWith('http')) continue
-      results.push({ url, title: m[2].trim(), snippet: snippets[si++] || '' })
-    }
-    return results
-  } catch { return [] }
+    const res = await axios.post('https://api.tavily.com/search', {
+      api_key: key,
+      query,
+      search_depth: 'advanced',
+      max_results: 5,
+      include_answer: true,
+    }, { timeout: 15000 })
+    const out = []
+    if (res.data?.answer) out.push({ title: 'Summary', snippet: res.data.answer, url: '' })
+    for (const r of (res.data?.results || []).slice(0, 4))
+      out.push({ title: r.title, snippet: r.content || '', url: r.url })
+    return out
+  } catch (e) {
+    throttledLog('poly:tavily', `[POLY] Tavily error: ${e.message}`)
+    return []
+  }
 }
 
 async function searchWikipedia(query) {
@@ -496,30 +480,13 @@ async function searchWikipedia(query) {
   } catch { return [] }
 }
 
-async function fetchPageText(url, maxChars = 2500) {
-  try {
-    const res = await axios.get(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; GAIABot/1.0)' },
-      timeout: 8000, maxContentLength: 300000,
-    })
-    return String(res.data)
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ').trim().slice(0, maxChars)
-  } catch { return '' }
-}
-
 async function researchMarket(market) {
-  const query = `${market.question} site:reuters.com OR site:apnews.com OR site:bbc.com`
-  let results = await searchSerpAPI(query)
-  if (!results.length) results = await searchDDG(market.question + ' latest 2025')
+  let results = await searchTavily(market.question)
   if (!results.length) results = await searchWikipedia(market.question)
 
   const sections = []
-  for (const r of results.slice(0, 3)) {
-    const text = r.snippet.length > 150 ? r.snippet : await fetchPageText(r.url, 2000)
-    if (text) sections.push(`[${r.title}]\n${text.slice(0, 1800)}`)
+  for (const r of results.slice(0, 4)) {
+    if (r.snippet) sections.push(`[${r.title}]\n${r.snippet.slice(0, 1800)}`)
   }
   return sections.join('\n\n---\n\n') || '(no research available)'
 }
@@ -565,7 +532,7 @@ CONFIDENCE: [LOW|MEDIUM|HIGH]
 REASONING: [2 sentences of concrete evidence]
 RECOMMENDATION: [BET_YES|BET_NO|SKIP]
 
-Only BET_YES/BET_NO if ALL true: (1) probability differs >8pp from market, (2) HIGH or MEDIUM confidence, (3) concrete recent evidence. When in doubt → SKIP`
+Only BET_YES/BET_NO if ALL true: (1) probability differs >3pp from market, (2) HIGH or MEDIUM confidence, (3) concrete recent evidence. When in doubt → SKIP`
 
   try {
     const msg = await anthropic.messages.create({
