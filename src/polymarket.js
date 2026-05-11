@@ -31,6 +31,7 @@ const crypto     = require('crypto')
 
 // ── Constants ─────────────────────────────────────────────────
 
+const FUNDED_PATH      = path.join(__dirname, '../data/funded-children.json')
 const GAMMA_API        = 'https://gamma-api.polymarket.com'
 const CLOB_HOST        = 'https://clob.polymarket.com'
 const POLYGON_CHAIN    = process.env.POLYGON_TESTNET === 'true' ? 80002 : 137
@@ -120,6 +121,66 @@ function loadState() {
       if (n) console.log(`[POLY] Loaded CLOB creds for ${n} child${n !== 1 ? 'ren' : ''}`)
     }
   } catch { childCreds = {} }
+
+  try {
+    if (fs.existsSync(FUNDED_PATH)) {
+      const saved = JSON.parse(fs.readFileSync(FUNDED_PATH, 'utf8'))
+      for (const id of saved) fundedChildren.add(id)
+    }
+  } catch {}
+}
+
+function saveFundedChildren() {
+  try { ensureDataDir(); fs.writeFileSync(FUNDED_PATH, JSON.stringify([...fundedChildren], null, 2)) } catch {}
+}
+
+async function drainOrphanedChildren(activeIds) {
+  let orphans = []
+  try {
+    if (fs.existsSync(FUNDED_PATH)) {
+      const saved = JSON.parse(fs.readFileSync(FUNDED_PATH, 'utf8'))
+      orphans = saved.filter(id => !activeIds.includes(id))
+    }
+  } catch {}
+  if (!orphans.length) return
+
+  console.log(`[POLY] Draining ${orphans.length} orphaned child wallet(s): ${orphans.join(', ')}`)
+  const mother = motherPolyWallet()
+  if (!mother) return
+
+  const usdc = new ethers.Contract(POLY_USDC, ERC20_ABI, mother)
+
+  for (const childId of orphans) {
+    try {
+      const wallet  = deriveChildPolyWallet(childId)
+      if (!wallet) continue
+      const addr    = wallet.address
+      const usdcBal = await usdc.balanceOf(addr)
+      const polBal  = await polygonProvider.getBalance(addr)
+      const gasCost = ethers.parseEther('0.005')
+
+      if (usdcBal > 0n) {
+        if (polBal < gasCost) {
+          await (await mother.sendTransaction({ to: addr, value: gasCost })).wait()
+        }
+        const tx = await new ethers.Contract(POLY_USDC, ERC20_ABI, wallet).transfer(mother.address, usdcBal)
+        await tx.wait()
+        console.log(`[POLY] ✓ Drained $${ethers.formatUnits(usdcBal, 6)} USDC from ${childId}`)
+      }
+
+      const remaining = await polygonProvider.getBalance(addr)
+      if (remaining > gasCost) {
+        const send = remaining - gasCost
+        await (await wallet.sendTransaction({ to: mother.address, value: send })).wait()
+        console.log(`[POLY] ✓ Drained ${ethers.formatEther(send)} POL from ${childId}`)
+      }
+
+      fundedChildren.delete(childId)
+    } catch (e) {
+      console.log(`[POLY] Drain failed for ${childId}: ${e.message}`)
+    }
+  }
+  saveFundedChildren()
 }
 
 function savePositions() {
@@ -208,14 +269,14 @@ async function fundChildPoly(childId, childAddress) {
 
     if (childUsdc >= amount / 2n) {
       console.log(`[POLY] ${childId} already has $${ethers.formatUnits(childUsdc, 6)} USDC — skipping USDC seed`)
-      fundedChildren.add(childId)
+      fundedChildren.add(childId); saveFundedChildren()
     } else {
       const motherBal = await usdc.balanceOf(mother.address)
       if (motherBal >= amount) {
         const tx = await usdc.transfer(childAddress, amount)
         await tx.wait()
         console.log(`[POLY] ✓ $${CHILD_POLY_SEED} USDC → ${childId}`)
-        fundedChildren.add(childId)
+        fundedChildren.add(childId); saveFundedChildren()
       } else {
         throttledLog('poly:usdc-low', `[POLY] Mother has $${ethers.formatUnits(motherBal, 6)} USDC (need $${CHILD_POLY_SEED})`)
       }
@@ -776,6 +837,12 @@ function start(colony, onEarning) {
   _colony    = colony
   _onEarning = onEarning
   loadState()
+
+  // Drain orphaned children from previous deploys after colony settles
+  setTimeout(async () => {
+    const activeIds = (colony.children || []).map(c => c.id)
+    await drainOrphanedChildren(activeIds)
+  }, 30000)
 
   // Initial scan after 45s (let colony settle)
   setTimeout(() => {
