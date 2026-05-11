@@ -47,7 +47,7 @@ const MAX_EXPOSURE     = 0.20
 const MIN_EDGE         = 0.03
 const CHILD_POLY_SEED  = 1.00   // USDC to seed each child's Polygon wallet
 const CHILD_MATIC_SEED = '0.05' // MATIC for gas
-const MAX_MARKETS      = 8
+const MAX_MARKETS      = 20
 const SCAN_MS          = 15 * 60 * 1000
 const SURVIVAL_SCAN_MS = 15 * 60 * 1000
 const RESOLVE_MS       = 30 * 60 * 1000
@@ -487,7 +487,7 @@ async function fetchMarkets() {
       .filter(m => {
         const end = new Date(m.endDate || m.end_date_iso || 0).getTime()
         const hrs  = (end - now) / 3600000
-        return hrs > 0.5 && hrs <= 1800 && parseFloat(m.volume || 0) > 100
+        return hrs > 0.5 && hrs <= 24 && parseFloat(m.volume || 0) > 100
       })
       .sort((a, b) => {
         const aEnd = new Date(a.endDate || a.end_date_iso || 0).getTime()
