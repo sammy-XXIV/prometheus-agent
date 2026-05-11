@@ -489,7 +489,11 @@ async function fetchMarkets() {
         const hrs  = (end - now) / 3600000
         return hrs > 0.5 && hrs <= 1800 && parseFloat(m.volume || 0) > 100
       })
-      .sort((a, b) => parseFloat(b.volume || 0) - parseFloat(a.volume || 0))
+      .sort((a, b) => {
+        const aEnd = new Date(a.endDate || a.end_date_iso || 0).getTime()
+        const bEnd = new Date(b.endDate || b.end_date_iso || 0).getTime()
+        return aEnd - bEnd
+      })
       .slice(0, MAX_MARKETS)
   } catch (e) {
     console.log('[POLY] Market fetch failed:', e.message)
