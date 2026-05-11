@@ -487,7 +487,7 @@ async function fetchMarkets() {
       .filter(m => {
         const end = new Date(m.endDate || m.end_date_iso || 0).getTime()
         const hrs  = (end - now) / 3600000
-        return hrs > 0.5 && hrs <= 72 && parseFloat(m.volume || 0) > 100
+        return hrs > 0.5 && hrs <= 168 && parseFloat(m.volume || 0) > 100
       })
       .sort((a, b) => parseFloat(b.volume || 0) - parseFloat(a.volume || 0))
       .slice(0, MAX_MARKETS)
