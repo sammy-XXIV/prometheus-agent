@@ -43,11 +43,11 @@ const MIN_BET          = 0.10
 const MAX_BET          = 0.50
 const KELLY_FRACTION   = 0.02
 const MAX_EXPOSURE     = 0.20
-const MIN_EDGE         = 0.05
+const MIN_EDGE         = 0.03
 const CHILD_POLY_SEED  = 1.00   // USDC to seed each child's Polygon wallet
 const CHILD_MATIC_SEED = '0.05' // MATIC for gas
 const MAX_MARKETS      = 8
-const SCAN_MS          = 60 * 60 * 1000
+const SCAN_MS          = 15 * 60 * 1000
 const SURVIVAL_SCAN_MS = 15 * 60 * 1000
 const RESOLVE_MS       = 30 * 60 * 1000
 
@@ -221,6 +221,15 @@ async function fundChildPoly(childId, childAddress) {
       }
     }
   } catch (e) { throttledLog('poly:usdc-seed', `[POLY] USDC seed failed: ${e.message}`) }
+
+  // Pre-approve CTF Exchange so first trade doesn't need extra gas time
+  try {
+    const wallet = deriveChildPolyWallet(childId)
+    if (wallet) {
+      const pol = await polygonProvider.getBalance(wallet.address)
+      if (pol > 0n) await ensureApproval(wallet)
+    }
+  } catch (e) { throttledLog('poly:pre-approve', `[POLY] Pre-approval failed: ${e.message}`) }
 }
 
 // ── CLOB credential creation ──────────────────────────────────
