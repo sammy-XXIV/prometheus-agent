@@ -189,7 +189,7 @@ async function fundChildPoly(childId, childAddress) {
       console.log(`[POLY] ${childId} already has ${ethers.formatEther(childPol)} POL — skipping gas seed`)
     } else {
       const maticBal = await polygonProvider.getBalance(mother.address)
-      if (maticBal > maticSeed * 3n) {
+      if (maticBal > maticSeed) {
         console.log(`[POLY] 💸 Seeding gas for ${childId} (${childAddress.slice(0, 10)}…)`)
         const tx = await mother.sendTransaction({ to: childAddress, value: maticSeed })
         await tx.wait()
