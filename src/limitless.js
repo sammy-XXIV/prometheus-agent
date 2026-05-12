@@ -88,19 +88,25 @@ async function fetchMarkets() {
     const all    = []
     let   page   = 1
 
-    while (all.length < 60) {
-      const res = await fetcher.getActiveMarkets({ limit: 25, sortBy: 'ending_soon', page })
-      if (!res.data?.length) break
-      all.push(...res.data)
-      if (res.data.length < 25) break
+    // Paginate via direct API since SDK has instability beyond page 1
+    while (all.length < 200) {
+      const res = await axios.get('https://api.limitless.exchange/markets/active', {
+        params: { limit: 25, sortBy: 'ending_soon', page },
+        timeout: 12000,
+      })
+      const data = res.data?.data || []
+      if (!data.length) break
+      all.push(...data)
+      if (data.length < 25) break
       page++
+      if (page > 10) break
     }
 
     return all.filter(m => {
       const end     = m.expirationTimestamp || 0
       const hrs     = (end - now) / 3600000
       const minSize = parseFloat(m.metadata?.minSize || m.settings?.minSize || 0) / 1e6
-      return hrs > 0.25 && hrs <= 48 && minSize === 0
+      return hrs > 0.25 && hrs <= 48 && minSize === 0 && m.tradeType === 'clob'
     }).sort((a, b) => (a.expirationTimestamp || 0) - (b.expirationTimestamp || 0))
   } catch (e) {
     console.log('[LMT] Market fetch failed:', e.message)
@@ -199,7 +205,9 @@ async function placeOrder(market, analysis, balance) {
   if (!approved) return
 
   const isYes   = analysis.recommendation === 'BET_YES'
-  const tokenId = isYes ? market.tokens?.yes : market.tokens?.no
+  const tokenId = isYes
+    ? (market.tokens?.yes || market.positionIds?.[0])
+    : (market.tokens?.no  || market.positionIds?.[1])
   const price   = isYes ? analysis.yesPrice : analysis.noPrice
   const betSize = calcBetSize(balance)
   const size    = parseFloat((betSize / price).toFixed(4))
