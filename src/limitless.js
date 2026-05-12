@@ -38,10 +38,11 @@ const anthropic  = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 const provider   = new ethers.JsonRpcProvider(BASE_RPC)
 
 function buildHttpClient() {
-  const apiKey = (process.env.LIMITLESS_API_KEY || '').trim()
+  const tokenId = (process.env.LIMITLESS_API_KEY_ID || '').trim()
+  const secret  = (process.env.LIMITLESS_API_SECRET || '').trim()
   return new HttpClient({
     baseURL: 'https://api.limitless.exchange',
-    ...(apiKey ? { additionalHeaders: { 'X-API-Key': apiKey } } : {}),
+    ...(tokenId && secret ? { hmacCredentials: { tokenId, secret } } : {}),
   })
 }
 
