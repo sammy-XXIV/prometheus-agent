@@ -36,7 +36,16 @@ let _approved  = false
 
 const anthropic  = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 const provider   = new ethers.JsonRpcProvider(BASE_RPC)
-const httpClient = new HttpClient({ baseURL: 'https://api.limitless.exchange' })
+
+function buildHttpClient() {
+  const apiKey = (process.env.LIMITLESS_API_KEY || '').trim()
+  return new HttpClient({
+    baseURL: 'https://api.limitless.exchange',
+    ...(apiKey ? { additionalHeaders: { 'X-API-Key': apiKey } } : {}),
+  })
+}
+
+const httpClient = buildHttpClient()
 const fetcher    = new MarketFetcher(httpClient)
 
 // ── Wallet ────────────────────────────────────────────────────
@@ -222,7 +231,7 @@ async function placeOrder(market, analysis, balance) {
   )
 
   try {
-    const orderClient = new OrderClient({ httpClient, wallet })
+    const orderClient = new OrderClient({ httpClient: buildHttpClient(), wallet })
     const order = await orderClient.createOrder({
       tokenId: tokenId.toString(),
       price,
