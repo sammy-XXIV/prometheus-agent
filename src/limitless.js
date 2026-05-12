@@ -1,8 +1,8 @@
 'use strict'
 /**
  * limitless.js — Limitless Exchange prediction market engine
- * Mirrors polymarket.js structure: scan → research → Claude → trade
- * Chain: Base | Token: USDC | Short-expiry markets (ending_soon)
+ * Targets short-expiry markets with no minimum size (esports, football, events)
+ * Chain: Base | Token: USDC
  */
 
 const axios      = require('axios')
@@ -12,14 +12,14 @@ const { HttpClient, MarketFetcher, OrderClient, Side, OrderType } = require('@li
 
 // ── Constants ─────────────────────────────────────────────────
 
-const BASE_RPC      = 'https://mainnet.base.org'
-const BASE_USDC     = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
-const MIN_EDGE      = 0.03
-const MIN_BET       = 0.10
-const MAX_BET       = 0.50
-const KELLY_FRACTION= 0.02
-const MAX_MARKETS   = 20
-const SCAN_MS       = 15 * 60 * 1000
+const BASE_RPC       = 'https://mainnet.base.org'
+const BASE_USDC      = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
+const EXCHANGE_ADDR  = '0x05c748E2f4DcDe0ec9Fa8DDc40DE6b867f923fa5' // Limitless CTF exchange on Base
+const MIN_EDGE       = 0.03
+const MIN_BET        = 0.10
+const MAX_BET        = 0.50
+const KELLY_FRACTION = 0.02
+const SCAN_MS        = 15 * 60 * 1000
 
 const ERC20_ABI = [
   'function balanceOf(address) view returns (uint256)',
@@ -29,15 +29,13 @@ const ERC20_ABI = [
 
 // ── State ─────────────────────────────────────────────────────
 
-let _colony    = null
 let _onEarning = null
 let _lastScan  = 0
-let _markets   = []   // { market, analysis, analyzedAt }
-let _positions = {}   // orderId → position info
+let _positions = {}
+let _approved  = false
 
 const anthropic  = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 const provider   = new ethers.JsonRpcProvider(BASE_RPC)
-
 const httpClient = new HttpClient({ baseURL: 'https://api.limitless.exchange' })
 const fetcher    = new MarketFetcher(httpClient)
 
@@ -61,19 +59,18 @@ async function getUSDCBalance() {
 
 // ── CTF Approval ──────────────────────────────────────────────
 
-const CTF_ADDRESS = '0xC9c98965297Bc527861c898329Ee280632B76e18'
-let _approved = false
-
 async function ensureApproval(wallet) {
   if (_approved) return true
   try {
     const usdc      = new ethers.Contract(BASE_USDC, ERC20_ABI, wallet)
-    const allowance = await usdc.allowance(wallet.address, CTF_ADDRESS)
+    const allowance = await usdc.allowance(wallet.address, EXCHANGE_ADDR)
     if (allowance < ethers.parseUnits('100', 6)) {
       console.log('[LMT] Approving CTF Exchange on Base...')
-      const tx = await usdc.approve(CTF_ADDRESS, ethers.MaxUint256)
+      const tx = await usdc.approve(EXCHANGE_ADDR, ethers.MaxUint256)
       await tx.wait()
       console.log('[LMT] ✓ USDC approved for Limitless CTF Exchange')
+    } else {
+      console.log('[LMT] ✓ CTF Exchange already approved')
     }
     _approved = true
     return true
@@ -87,13 +84,24 @@ async function ensureApproval(wallet) {
 
 async function fetchMarkets() {
   try {
-    const res = await fetcher.getActiveMarkets({ limit: MAX_MARKETS, sortBy: 'ending_soon' })
-    const now = Date.now()
-    return (res.data || []).filter(m => {
-      const end = new Date(m.expirationDate || m.endDate || 0).getTime()
-      const hrs = (end - now) / 3600000
-      return hrs > 0.25 && hrs <= 24
-    })
+    const now    = Date.now()
+    const all    = []
+    let   page   = 1
+
+    while (all.length < 60) {
+      const res = await fetcher.getActiveMarkets({ limit: 25, sortBy: 'ending_soon', page })
+      if (!res.data?.length) break
+      all.push(...res.data)
+      if (res.data.length < 25) break
+      page++
+    }
+
+    return all.filter(m => {
+      const end     = m.expirationTimestamp || 0
+      const hrs     = (end - now) / 3600000
+      const minSize = parseFloat(m.metadata?.minSize || m.settings?.minSize || 0) / 1e6
+      return hrs > 0.25 && hrs <= 48 && minSize === 0
+    }).sort((a, b) => (a.expirationTimestamp || 0) - (b.expirationTimestamp || 0))
   } catch (e) {
     console.log('[LMT] Market fetch failed:', e.message)
     return []
@@ -124,14 +132,12 @@ async function researchMarket(question) {
 // ── Claude Analysis ───────────────────────────────────────────
 
 async function analyzeMarket(market, research) {
-  const outcomes = market.tokens || market.outcomes || []
-  const yesToken = outcomes.find(t => t.outcome?.toLowerCase() === 'yes' || t.side === 'yes') || outcomes[0]
-  const yesPrice = parseFloat(yesToken?.price ?? 0.5)
-  const noPrice  = 1 - yesPrice
-
-  const end      = new Date(market.expirationDate || market.endDate || 0)
+  const prices   = market.prices || [0.5, 0.5]
+  const yesPrice = parseFloat(prices[0]) || 0.5
+  const noPrice  = parseFloat(prices[1]) || (1 - yesPrice)
+  const end      = market.expirationTimestamp || 0
   const hrs      = ((end - Date.now()) / 3600000).toFixed(1)
-  const vol      = parseFloat(market.volume || market.liquidity || 0).toFixed(0)
+  const vol      = parseFloat(market.volume || 0).toFixed(0)
 
   const prompt = `You are a disciplined prediction market analyst making real money decisions.
 
@@ -169,7 +175,7 @@ Only BET_YES/BET_NO if ALL true: (1) probability differs >3pp from market, (2) H
                : recommendation === 'BET_NO'  ? noPrice - (1 - probability)
                : 0
 
-    return { probability, confidence, recommendation, edge, yesPrice, noPrice, yesToken, outcomes }
+    return { probability, confidence, recommendation, edge, yesPrice, noPrice }
   } catch (e) {
     console.log('[LMT] Claude error:', e.message)
     return null
@@ -192,28 +198,26 @@ async function placeOrder(market, analysis, balance) {
   const approved = await ensureApproval(wallet)
   if (!approved) return
 
-  const side      = analysis.recommendation === 'BET_YES' ? Side.BUY : Side.BUY
-  const token     = analysis.recommendation === 'BET_YES' ? analysis.yesToken : analysis.outcomes?.find(t => t.outcome?.toLowerCase() === 'no' || t.side === 'no') || analysis.outcomes?.[1]
-  const price     = analysis.recommendation === 'BET_YES' ? analysis.yesPrice : analysis.noPrice
-  const betSize   = calcBetSize(balance)
-  const size      = parseFloat((betSize / price).toFixed(2))
+  const isYes   = analysis.recommendation === 'BET_YES'
+  const tokenId = isYes ? market.tokens?.yes : market.tokens?.no
+  const price   = isYes ? analysis.yesPrice : analysis.noPrice
+  const betSize = calcBetSize(balance)
+  const size    = parseFloat((betSize / price).toFixed(4))
 
-  if (!token?.tokenId && !token?.id) {
+  if (!tokenId) {
     console.log('[LMT] No token ID found for order')
     return
   }
 
-  const tokenId = token.tokenId || token.id
-
   console.log(
-    `[LMT] 🎲 ${analysis.recommendation} "${(market.title || market.question || '').slice(0, 55)}…"` +
+    `[LMT] 🎲 ${analysis.recommendation} "${(market.title || '').slice(0, 55)}…"` +
     `\n[LMT]    edge=${(analysis.edge*100).toFixed(1)}%  stake=$${betSize.toFixed(2)}  price=${price.toFixed(3)}`
   )
 
   try {
     const orderClient = new OrderClient({ httpClient, wallet })
     const order = await orderClient.createOrder({
-      tokenId,
+      tokenId: tokenId.toString(),
       price,
       size,
       side: Side.BUY,
@@ -222,7 +226,7 @@ async function placeOrder(market, analysis, balance) {
     })
     console.log(`[LMT] ✓ Order placed: ${order.id || JSON.stringify(order)}`)
     _positions[order.id || Date.now()] = {
-      marketTitle: market.title || market.question,
+      marketTitle: market.title,
       recommendation: analysis.recommendation,
       price,
       size,
@@ -238,7 +242,7 @@ async function placeOrder(market, analysis, balance) {
 // ── Scan Cycle ────────────────────────────────────────────────
 
 async function runScanCycle() {
-  _lastScan = Date.now()
+  _lastScan     = Date.now()
   const balance = await getUSDCBalance()
   console.log(`[LMT] Scanning prediction markets... (Base USDC: $${balance.toFixed(4)})`)
 
@@ -249,36 +253,32 @@ async function runScanCycle() {
 
   const markets = await fetchMarkets()
   if (!markets.length) {
-    console.log('[LMT] No qualifying markets (ending within 24h)')
+    console.log('[LMT] No qualifying markets (ending within 48h, no min size)')
     return
   }
 
   console.log(`[LMT] Analyzing ${markets.length} markets...`)
-  _markets = []
 
-  for (const market of markets) {
+  for (const market of markets.slice(0, 15)) {
     const question = market.title || market.question || ''
     const research = await researchMarket(question)
     const analysis = await analyzeMarket(market, research)
-    if (analysis) {
-      _markets.push({ market, analysis })
-      console.log(`[LMT] ${question.slice(0,50)} → ${analysis.recommendation} (edge=${(analysis.edge*100).toFixed(1)}% conf=${analysis.confidence})`)
-    }
-  }
+    if (!analysis) continue
 
-  for (const { market, analysis } of _markets) {
+    console.log(`[LMT] ${question.slice(0,50)} → ${analysis.recommendation} edge=${(analysis.edge*100).toFixed(1)}% conf=${analysis.confidence}`)
+
     if (analysis.recommendation === 'SKIP') continue
     if (!['HIGH', 'MEDIUM'].includes(analysis.confidence)) continue
     if (Math.abs(analysis.edge) < MIN_EDGE) continue
+
     await placeOrder(market, analysis, balance)
-    break // one trade per scan cycle
+    break
   }
 }
 
 // ── Module Init ───────────────────────────────────────────────
 
 function start(colony, onEarning) {
-  _colony    = colony
   _onEarning = onEarning
 
   const wallet = getWallet()
@@ -289,7 +289,6 @@ function start(colony, onEarning) {
 
   console.log(`[LMT] Limitless engine initialized — wallet: ${wallet.address}`)
 
-  // Run approval immediately then first scan after 20s
   ensureApproval(wallet).then(() => {
     setTimeout(() => {
       runScanCycle()
