@@ -105,8 +105,7 @@ async function fetchMarkets() {
     return all.filter(m => {
       const end     = m.expirationTimestamp || 0
       const hrs     = (end - now) / 3600000
-      const minSize = parseFloat(m.metadata?.minSize || m.settings?.minSize || 0) / 1e6
-      return hrs > 0.25 && hrs <= 48 && minSize === 0 && m.tradeType === 'clob'
+      return hrs > 0.25 && hrs <= 48 && m.tradeType === 'clob'
     }).sort((a, b) => (a.expirationTimestamp || 0) - (b.expirationTimestamp || 0))
   } catch (e) {
     console.log('[LMT] Market fetch failed:', e.message)
