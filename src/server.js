@@ -11,6 +11,7 @@ const authModule = require('./auth')
 const userColony = require('./userColony')
 const db = require('./db')
 const { POLYGON_CHAIN_ID, TESTNET } = require('./rpcProvider')
+const presaga = require('./presaga')
 
 const app = express()
 const cors = require('cors')
@@ -860,6 +861,10 @@ app.get('/app',    authModule.requireAuth, (req, res) => res.sendFile(path.join(
 app.listen(config.port, () => {
   console.log(`GAIA serving ${Object.keys(config.services).length} services on port ${config.port}`)
   userColony.resumeAll()
+
+  // Presaga trading — run immediately then every 30 minutes
+  presaga.run().catch(e => console.error('[Presaga] startup error:', e.message))
+  setInterval(() => presaga.run().catch(e => console.error('[Presaga] error:', e.message)), 30 * 60 * 1000)
 })
 
 module.exports = app
